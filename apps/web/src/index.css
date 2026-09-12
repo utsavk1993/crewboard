@@ -40,6 +40,20 @@
   --border: oklch(0.915 0.005 264);
   --input: oklch(0.9 0.006 264);
   --ring: oklch(0.52 0.19 272);
+
+  /* Avatar tints: soft, distinct hues; initials on each tint clear 6:1. Chroma is capped to stay in sRGB. */
+  --avatar-1: oklch(0.94 0.025 262);
+  --avatar-1-foreground: oklch(0.45 0.1 262);
+  --avatar-2: oklch(0.94 0.04 200);
+  --avatar-2-foreground: oklch(0.45 0.068 200);
+  --avatar-3: oklch(0.94 0.04 155);
+  --avatar-3-foreground: oklch(0.45 0.1 155);
+  --avatar-4: oklch(0.94 0.04 80);
+  --avatar-4-foreground: oklch(0.45 0.083 80);
+  --avatar-5: oklch(0.94 0.027 25);
+  --avatar-5-foreground: oklch(0.45 0.1 25);
+  --avatar-6: oklch(0.94 0.04 325);
+  --avatar-6-foreground: oklch(0.45 0.1 325);
 }
 
 .dark {
@@ -69,6 +83,19 @@
   --border: oklch(1 0 0 / 9%);
   --input: oklch(1 0 0 / 13%);
   --ring: oklch(0.68 0.16 272);
+
+  --avatar-1: oklch(0.32 0.06 262);
+  --avatar-1-foreground: oklch(0.87 0.057 262);
+  --avatar-2: oklch(0.32 0.048 200);
+  --avatar-2-foreground: oklch(0.87 0.07 200);
+  --avatar-3: oklch(0.32 0.06 155);
+  --avatar-3-foreground: oklch(0.87 0.07 155);
+  --avatar-4: oklch(0.32 0.059 80);
+  --avatar-4-foreground: oklch(0.87 0.07 80);
+  --avatar-5: oklch(0.32 0.06 25);
+  --avatar-5-foreground: oklch(0.87 0.062 25);
+  --avatar-6: oklch(0.32 0.06 325);
+  --avatar-6-foreground: oklch(0.87 0.07 325);
 }
 
 @theme inline {
@@ -104,6 +131,18 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-avatar-1: var(--avatar-1);
+  --color-avatar-1-foreground: var(--avatar-1-foreground);
+  --color-avatar-2: var(--avatar-2);
+  --color-avatar-2-foreground: var(--avatar-2-foreground);
+  --color-avatar-3: var(--avatar-3);
+  --color-avatar-3-foreground: var(--avatar-3-foreground);
+  --color-avatar-4: var(--avatar-4);
+  --color-avatar-4-foreground: var(--avatar-4-foreground);
+  --color-avatar-5: var(--avatar-5);
+  --color-avatar-5-foreground: var(--avatar-5-foreground);
+  --color-avatar-6: var(--avatar-6);
+  --color-avatar-6-foreground: var(--avatar-6-foreground);
 }
 
 @layer base {
