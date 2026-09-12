@@ -9,7 +9,9 @@
     "test": "jest",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
-    "db:migrate": "prisma migrate deploy"
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma migrate reset --force && tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
@@ -19,6 +21,7 @@
     "zod": "^4.6.1"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.6.0",
     "@swc/core": "^1.16.2",
     "@swc/jest": "^0.2.39",
     "@types/express": "^5.0.6",

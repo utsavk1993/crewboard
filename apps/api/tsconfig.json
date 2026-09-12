@@ -14,5 +14,5 @@
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "test"]
+  "include": ["src", "prisma", "test", "prisma.config.ts"]
 }

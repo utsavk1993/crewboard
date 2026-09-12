@@ -7,6 +7,7 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
+    seed: 'tsx prisma/seed.ts',
   },
   datasource: {
     // Read directly (not via `env()`, which throws) so `prisma generate` works without a .env file.
