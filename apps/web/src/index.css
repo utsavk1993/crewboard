@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Enter/exit utilities (animate-in, fade-in-0, slide-in-from-right, ...) used by the overlay primitives. */
+@import "tw-animate-css";
 @import "@fontsource-variable/inter";
 
 /* Dark mode is class-driven (set on <html> by ThemeProvider and the inline script in index.html), not media-driven. */

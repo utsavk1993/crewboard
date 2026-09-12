@@ -26,3 +26,20 @@ class ResizeObserverStub {
 }
 
 globalThis.ResizeObserver ??= ResizeObserverStub
+
+// jsdom implements neither pointer capture nor scrollIntoView. Radix menus and selects call them while
+// handling pointer and keyboard interaction, and would throw without these no-ops.
+Element.prototype.hasPointerCapture ??= () => false
+Element.prototype.setPointerCapture ??= () => {}
+Element.prototype.releasePointerCapture ??= () => {}
+Element.prototype.scrollIntoView ??= () => {}
+
+// jsdom's selector engine resolves :modal and :fullscreen by calling element.matches again, so one check
+// costs millions of nested calls. Floating UI checks :modal on every position update, which made each
+// Radix menu or tooltip open take seconds. jsdom has no top layer, so these states can never match.
+const TOP_LAYER_STATES = new Set([':modal', ':fullscreen'])
+const nativeMatches = Element.prototype.matches
+
+Element.prototype.matches = function matches(this: Element, selector: string) {
+  return TOP_LAYER_STATES.has(selector.trim()) ? false : nativeMatches.call(this, selector)
+} as Element['matches']
