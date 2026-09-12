@@ -1,13 +1,7 @@
 import request from 'supertest'
 import { createApp } from '../src/app'
-import { prisma } from '../src/db'
 
 const app = createApp()
-
-// Close the connection pool so Jest can exit once the suite finishes.
-afterAll(async () => {
-  await prisma.$disconnect()
-})
 
 describe('app', () => {
   it('GET /api/health reports ok when the database is reachable', async () => {
