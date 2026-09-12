@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+.env
+*.log
+.DS_Store
+
+# Prisma client is generated on install
+apps/api/src/generated/
