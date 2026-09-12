@@ -11,9 +11,12 @@
     "test": "jest"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
     "@tanstack/react-query": "^5.102.8",
+    "clsx": "^2.1.1",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@swc/core": "^1.16.2",

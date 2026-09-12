@@ -4,6 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Crewboard</title>
+    <script>
+      // Runs before the stylesheet and React load so a reload never paints the wrong theme first.
+      // Keep in sync with ThemeProvider (src/components/theme/theme-provider.tsx): same storage key, values and query.
+      ;(function () {
+        var theme = null
+        try {
+          theme = window.localStorage.getItem('crewboard-theme')
+        } catch (error) {
+          // Storage can be blocked; fall through to the system preference.
+        }
+        if (theme !== 'light' && theme !== 'dark') {
+          theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        }
+        var root = document.documentElement
+        root.classList.toggle('dark', theme === 'dark')
+        root.style.colorScheme = theme
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
