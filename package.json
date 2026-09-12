@@ -8,7 +8,8 @@
   "scripts": {
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
-    "dev": "npm run dev -w apps/api",
+    "dev": "concurrently -n api,web -c blue,magenta \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "build": "npm run build -w apps/web",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
@@ -19,5 +20,8 @@
     "esbuild@0.28.2": true,
     "@swc/core@1.16.2": true,
     "unrs-resolver@1.12.2": true
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
   }
 }
