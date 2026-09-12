@@ -119,7 +119,7 @@ function SkillList({ skills }: { skills: string[] }) {
         <Tooltip>
           <TooltipTrigger asChild>
             {/* A button so keyboard users can focus it to reveal the tooltip. */}
-            <Badge asChild variant="outline" className="cursor-default text-muted-foreground">
+            <Badge asChild variant="outline" className="text-muted-foreground">
               <button type="button">
                 +{overflow.length}
                 <span className="sr-only"> more skills: {overflow.join(', ')}</span>
