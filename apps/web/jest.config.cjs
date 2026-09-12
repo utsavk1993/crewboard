@@ -15,6 +15,8 @@ module.exports = {
       },
     ],
   },
+  // TanStack Table ships only ES modules, which Jest's CommonJS runtime can't require untransformed.
+  transformIgnorePatterns: ['/node_modules/(?!@tanstack/(react-table|table-core)/)'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '\\.css$': 'identity-obj-proxy',
