@@ -6,6 +6,7 @@ import { z } from 'zod'
 config({ path: path.resolve(__dirname, '../.env'), quiet: true })
 
 const envSchema = z.object({
+  DATABASE_URL: z.string({ error: 'DATABASE_URL is not set. Copy apps/api/.env.example to apps/api/.env.' }).min(1),
   PORT: z.coerce.number().int().positive().default(8003),
 })
 
