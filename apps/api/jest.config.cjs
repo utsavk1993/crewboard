@@ -11,4 +11,8 @@ module.exports = {
       },
     ],
   },
+  // The generated Prisma client uses `.js` specifiers for its own `.ts` files.
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
 }
