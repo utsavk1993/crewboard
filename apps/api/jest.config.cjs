@@ -15,4 +15,9 @@ module.exports = {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
+  globalSetup: '<rootDir>/test/global-setup.ts',
+  setupFiles: ['<rootDir>/test/setup-env.ts'],
+  setupFilesAfterEnv: ['<rootDir>/test/setup-db.ts'],
+  // Integration tests share one database, so run test files serially (same as --runInBand).
+  maxWorkers: 1,
 }
