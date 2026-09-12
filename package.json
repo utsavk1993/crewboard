@@ -6,6 +6,8 @@
     "apps/*"
   ],
   "scripts": {
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
     "dev": "npm run dev -w apps/api",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
