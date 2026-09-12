@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 // Shared by plain, checkbox and radio rows so they highlight identically on hover and keyboard focus.
 const menuItemBase =
-  "relative flex cursor-default items-center gap-2 rounded-md py-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+  "relative flex cursor-pointer items-center gap-2 rounded-md py-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
 
 export function DropdownMenu(props: ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />

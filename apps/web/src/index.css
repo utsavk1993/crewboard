@@ -164,4 +164,18 @@
     /* Inter: single-storey a (cv11) and open digits (ss01) read better at dashboard sizes. */
     font-feature-settings: "cv11", "ss01";
   }
+
+  /* Tailwind v4's preflight leaves buttons with the arrow cursor; anything clickable should show a hand. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label[for],
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
