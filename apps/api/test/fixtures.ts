@@ -82,6 +82,7 @@ export async function resetDatabase() {
           phone: '(555) 010-0001',
           designation: 'Senior Technician',
           cityId: ids.surrey,
+          hiredOn: new Date('2016-03-14'),
         },
         {
           id: ids.bob,
@@ -90,6 +91,7 @@ export async function resetDatabase() {
           phone: '(555) 010-0002',
           designation: 'Technician',
           cityId: ids.langley,
+          hiredOn: new Date('2021-09-07'),
         },
         {
           id: ids.carol,
@@ -98,6 +100,7 @@ export async function resetDatabase() {
           phone: '(555) 010-0003',
           designation: 'Apprentice Technician',
           cityId: ids.kelowna,
+          hiredOn: new Date('2025-06-02'),
         },
       ],
     }),

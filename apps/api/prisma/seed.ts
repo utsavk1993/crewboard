@@ -6,6 +6,14 @@ faker.seed(20260910)
 
 const DESIGNATIONS = ['Apprentice Technician', 'Technician', 'Senior Technician', 'Lead Technician']
 
+// Days since hire by designation, so apprentices are recent hires and leads have been around for years.
+const TENURE_DAYS: Record<string, [min: number, max: number]> = {
+  'Apprentice Technician': [30, 2 * 365],
+  Technician: [365, 6 * 365],
+  'Senior Technician': [4 * 365, 10 * 365],
+  'Lead Technician': [9 * 365, 12 * 365],
+}
+
 // House number range, postal code prefixes (forward sortation areas) and real streets, so addresses fit the city.
 type CitySpec = [houseNumbers: [min: number, max: number], postalPrefixes: string, streets: string[]]
 type RegionSpec = { areaCodes: string[]; cities: Record<string, CitySpec> }
@@ -376,7 +384,6 @@ async function main() {
     return { technician, city, specialties: pickSpecialties(primary, categories, skills), load }
   })
 
-  const technicians = roster.map(({ technician }) => technician)
   const technicianSkills = roster.flatMap(({ technician, specialties }) =>
     specialties.map((skill) => ({ technicianId: technician.id, skillId: skill.id })),
   )
@@ -398,6 +405,17 @@ async function main() {
       const skill = faker.helpers.arrayElement(skills.filter(({ categoryId }) => categoryId === category.id))
       return job(skill, null, city, region.provinceCode)
     })
+
+  // Hire dates are drawn after everything else, so they don't shift any other seeded value.
+  const today = new Date()
+  const technicians = roster.map(({ technician }) => {
+    const [min, max] = TENURE_DAYS[technician.designation]!
+    const daysAgo = faker.number.int({ min, max })
+    return {
+      ...technician,
+      hiredOn: new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - daysAgo)),
+    }
+  })
 
   // Idempotent: wipe and re-insert in a single transaction.
   await prisma.$transaction([
