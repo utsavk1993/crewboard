@@ -1,5 +1,6 @@
 import express from 'express'
 import { errorHandler, notFoundHandler } from './errors'
+import { assistantRouter } from './routes/assistant'
 import { healthRouter } from './routes/health'
 import { jobsRouter } from './routes/jobs'
 import { techniciansRouter } from './routes/technicians'
@@ -7,6 +8,8 @@ import { techniciansRouter } from './routes/technicians'
 export function createApp() {
   const app = express()
   app.disable('x-powered-by')
+  // Ahead of the app-wide JSON parser: the assistant accepts larger request bodies and parses its own.
+  app.use('/api/assistant', assistantRouter)
   app.use(express.json())
 
   app.use('/api/health', healthRouter)
