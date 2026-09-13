@@ -48,6 +48,11 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ technicianId }),
     }),
+  sendAssistantMessage: (messages: { role: 'user' | 'assistant'; content: string }[]) =>
+    request<{ message: { role: 'assistant'; content: string } }>('/assistant/chat', {
+      method: 'POST',
+      body: JSON.stringify({ messages }),
+    }),
 }
 
 export function errorMessage(error: unknown): string {

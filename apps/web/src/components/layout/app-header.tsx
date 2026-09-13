@@ -1,5 +1,6 @@
 import { WrenchIcon } from 'lucide-react'
 import { Link } from 'react-router'
+import { AssistantButton } from '@/components/assistant/assistant-button'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { Separator } from '@/components/ui/separator'
 
@@ -23,6 +24,7 @@ export function AppHeader() {
           <span className="hidden text-sm text-muted-foreground min-[360px]:inline">Dispatch</span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <AssistantButton />
           <ThemeToggle />
         </div>
       </div>
