@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../db'
 import { HttpError, validate } from '../errors'
 import type { Prisma } from '../generated/prisma/client'
+import { skillSelect } from '../skills'
 
 export const jobsRouter = Router()
 
@@ -12,7 +13,7 @@ const jobSelect = {
   description: true,
   customerName: true,
   address: true,
-  requiredSkill: true,
+  skill: { select: skillSelect },
   priority: true,
   scheduledDate: true,
   technicianId: true,
@@ -20,6 +21,13 @@ const jobSelect = {
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.JobSelect
+
+type JobRow = Prisma.JobGetPayload<{ select: typeof jobSelect }>
+
+// `requiredSkill` repeats the specialty name for clients that only read names.
+function toJob({ skill, ...job }: JobRow) {
+  return { ...job, requiredSkill: skill.name, skill }
+}
 
 const listQuerySchema = z
   .object({
@@ -48,7 +56,7 @@ jobsRouter.get('/', async (req, res) => {
     select: jobSelect,
   })
 
-  res.json(jobs)
+  res.json(jobs.map(toJob))
 })
 
 jobsRouter.patch('/:id/assignment', async (req, res) => {
@@ -87,7 +95,7 @@ async function assignJob(jobId: string, technicianId: string) {
     )
   }
 
-  return prisma.job.findUniqueOrThrow({ where: { id: jobId }, select: jobSelect })
+  return toJob(await prisma.job.findUniqueOrThrow({ where: { id: jobId }, select: jobSelect }))
 }
 
 async function unassignJob(jobId: string) {
@@ -98,5 +106,5 @@ async function unassignJob(jobId: string) {
   })
   if (count === 0) throw jobNotFound()
 
-  return prisma.job.findUniqueOrThrow({ where: { id: jobId }, select: jobSelect })
+  return toJob(await prisma.job.findUniqueOrThrow({ where: { id: jobId }, select: jobSelect }))
 }

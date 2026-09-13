@@ -9,6 +9,15 @@ export const ids = {
   bobWaterHeaterJob: 'aaaaaaaa-0000-4000-8000-000000000003',
   unassignedDishwasherJob: 'aaaaaaaa-0000-4000-8000-000000000004',
   unassignedFaucetJob: 'aaaaaaaa-0000-4000-8000-000000000005',
+  hvac: 'cccccccc-0000-4000-8000-000000000001',
+  electrical: 'cccccccc-0000-4000-8000-000000000002',
+  plumbing: 'cccccccc-0000-4000-8000-000000000003',
+  applianceRepair: 'cccccccc-0000-4000-8000-000000000004',
+  airConditioning: 'dddddddd-0000-4000-8000-000000000001',
+  panelUpgrades: 'dddddddd-0000-4000-8000-000000000002',
+  waterHeaters: 'dddddddd-0000-4000-8000-000000000003',
+  dishwashers: 'dddddddd-0000-4000-8000-000000000004',
+  fixturesAndFaucets: 'dddddddd-0000-4000-8000-000000000005',
 } as const
 
 const day = (n: number) => new Date(Date.UTC(2030, 0, n))
@@ -17,7 +26,27 @@ const day = (n: number) => new Date(Date.UTC(2030, 0, n))
 export async function resetDatabase() {
   await prisma.$transaction([
     prisma.job.deleteMany(),
+    prisma.technicianSkill.deleteMany(),
     prisma.technician.deleteMany(),
+    prisma.skill.deleteMany(),
+    prisma.skillCategory.deleteMany(),
+    prisma.skillCategory.createMany({
+      data: [
+        { id: ids.hvac, name: 'HVAC' },
+        { id: ids.electrical, name: 'Electrical' },
+        { id: ids.plumbing, name: 'Plumbing' },
+        { id: ids.applianceRepair, name: 'Appliance Repair' },
+      ],
+    }),
+    prisma.skill.createMany({
+      data: [
+        { id: ids.airConditioning, name: 'Air Conditioning', categoryId: ids.hvac },
+        { id: ids.panelUpgrades, name: 'Panel Upgrades', categoryId: ids.electrical },
+        { id: ids.waterHeaters, name: 'Water Heaters', categoryId: ids.plumbing },
+        { id: ids.dishwashers, name: 'Dishwashers', categoryId: ids.applianceRepair },
+        { id: ids.fixturesAndFaucets, name: 'Fixtures & Faucets', categoryId: ids.plumbing },
+      ],
+    }),
     prisma.technician.createMany({
       data: [
         {
@@ -27,7 +56,6 @@ export async function resetDatabase() {
           phone: '(555) 010-0001',
           designation: 'Senior Technician',
           region: 'North',
-          skills: ['HVAC', 'Electrical'],
         },
         {
           id: ids.bob,
@@ -36,7 +64,6 @@ export async function resetDatabase() {
           phone: '(555) 010-0002',
           designation: 'Technician',
           region: 'South',
-          skills: ['Plumbing'],
         },
         {
           id: ids.carol,
@@ -45,30 +72,37 @@ export async function resetDatabase() {
           phone: '(555) 010-0003',
           designation: 'Apprentice Technician',
           region: 'Central',
-          skills: ['Appliance Repair'],
         },
+      ],
+    }),
+    prisma.technicianSkill.createMany({
+      data: [
+        { technicianId: ids.alice, skillId: ids.airConditioning },
+        { technicianId: ids.alice, skillId: ids.panelUpgrades },
+        { technicianId: ids.bob, skillId: ids.waterHeaters },
+        { technicianId: ids.carol, skillId: ids.dishwashers },
       ],
     }),
     prisma.job.createMany({
       data: [
-        job(ids.aliceAcJob, 'AC unit not cooling', 'HVAC', day(3), ids.alice),
-        job(ids.aliceBreakerJob, 'Breaker keeps tripping', 'Electrical', day(1), ids.alice),
-        job(ids.bobWaterHeaterJob, 'Replace water heater', 'Plumbing', day(2), ids.bob),
-        job(ids.unassignedDishwasherJob, 'Dishwasher not draining', 'Appliance Repair', day(5), null),
-        job(ids.unassignedFaucetJob, 'Leaking kitchen faucet', 'Plumbing', day(4), null),
+        job(ids.aliceAcJob, 'AC unit not cooling', ids.airConditioning, day(3), ids.alice),
+        job(ids.aliceBreakerJob, 'Breaker keeps tripping', ids.panelUpgrades, day(1), ids.alice),
+        job(ids.bobWaterHeaterJob, 'Replace water heater', ids.waterHeaters, day(2), ids.bob),
+        job(ids.unassignedDishwasherJob, 'Dishwasher not draining', ids.dishwashers, day(5), null),
+        job(ids.unassignedFaucetJob, 'Leaking kitchen faucet', ids.fixturesAndFaucets, day(4), null),
       ],
     }),
   ])
 }
 
-function job(id: string, title: string, requiredSkill: string, scheduledDate: Date, technicianId: string | null) {
+function job(id: string, title: string, skillId: string, scheduledDate: Date, technicianId: string | null) {
   return {
     id,
     title,
     description: `${title} (test fixture)`,
     customerName: 'Test Customer',
     address: '1 Test Street, Testville',
-    requiredSkill,
+    skillId,
     priority: 'MEDIUM' as const,
     scheduledDate,
     technicianId,

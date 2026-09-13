@@ -15,6 +15,41 @@ enum Priority {
   URGENT
 }
 
+model SkillCategory {
+  id   String @id @default(uuid()) @db.Uuid
+  name String @unique
+
+  skills Skill[]
+
+  @@map("skill_categories")
+}
+
+/// A specialty within a category, e.g. Appliance Repair › Refrigerators.
+model Skill {
+  id         String        @id @default(uuid()) @db.Uuid
+  name       String        @unique
+  categoryId String        @map("category_id") @db.Uuid
+  category   SkillCategory @relation(fields: [categoryId], references: [id])
+
+  technicians TechnicianSkill[]
+  jobs        Job[]
+
+  @@index([categoryId])
+  @@map("skills")
+}
+
+model TechnicianSkill {
+  technicianId String     @map("technician_id") @db.Uuid
+  technician   Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  skillId      String     @map("skill_id") @db.Uuid
+  skill        Skill      @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  // The primary key covers lookups by technician; this index covers lookups by skill.
+  @@id([technicianId, skillId])
+  @@index([skillId])
+  @@map("technician_skills")
+}
+
 model Technician {
   id          String   @id @default(uuid()) @db.Uuid
   name        String
@@ -22,11 +57,11 @@ model Technician {
   phone       String
   designation String
   region      String
-  skills      String[]
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  jobs Job[]
+  skills TechnicianSkill[]
+  jobs   Job[]
 
   @@map("technicians")
 }
@@ -37,7 +72,8 @@ model Job {
   description   String
   customerName  String      @map("customer_name")
   address       String
-  requiredSkill String      @map("required_skill")
+  skillId       String      @map("skill_id") @db.Uuid
+  skill         Skill       @relation(fields: [skillId], references: [id])
   priority      Priority
   scheduledDate DateTime    @map("scheduled_date") @db.Date
   technicianId  String?     @map("technician_id") @db.Uuid
@@ -47,5 +83,6 @@ model Job {
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
   @@index([technicianId])
+  @@index([skillId])
   @@map("jobs")
 }

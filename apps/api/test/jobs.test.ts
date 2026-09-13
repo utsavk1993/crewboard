@@ -27,11 +27,29 @@ describe('GET /api/jobs', () => {
     expect(res.body[0]).toMatchObject({
       id: ids.aliceBreakerJob,
       title: 'Breaker keeps tripping',
-      requiredSkill: 'Electrical',
+      requiredSkill: 'Panel Upgrades',
+      skill: { id: ids.panelUpgrades, name: 'Panel Upgrades', category: { id: ids.electrical, name: 'Electrical' } },
       priority: 'MEDIUM',
       scheduledDate: '2030-01-01T00:00:00.000Z',
       technicianId: ids.alice,
       assignedAt: '2029-12-31T12:00:00.000Z',
+    })
+  })
+
+  it('includes each job\'s specialty and category', async () => {
+    const res = await request(app).get('/api/jobs')
+
+    expect(
+      Object.fromEntries(res.body.map((job: { id: string; requiredSkill: string; skill: unknown }) => [job.id, [job.requiredSkill, job.skill]])),
+    ).toEqual({
+      [ids.aliceAcJob]: ['Air Conditioning', { id: ids.airConditioning, name: 'Air Conditioning', category: { id: ids.hvac, name: 'HVAC' } }],
+      [ids.aliceBreakerJob]: ['Panel Upgrades', { id: ids.panelUpgrades, name: 'Panel Upgrades', category: { id: ids.electrical, name: 'Electrical' } }],
+      [ids.bobWaterHeaterJob]: ['Water Heaters', { id: ids.waterHeaters, name: 'Water Heaters', category: { id: ids.plumbing, name: 'Plumbing' } }],
+      [ids.unassignedDishwasherJob]: ['Dishwashers', { id: ids.dishwashers, name: 'Dishwashers', category: { id: ids.applianceRepair, name: 'Appliance Repair' } }],
+      [ids.unassignedFaucetJob]: [
+        'Fixtures & Faucets',
+        { id: ids.fixturesAndFaucets, name: 'Fixtures & Faucets', category: { id: ids.plumbing, name: 'Plumbing' } },
+      ],
     })
   })
 
@@ -78,7 +96,12 @@ describe('PATCH /api/jobs/:id/assignment', () => {
     const res = await assignment(ids.unassignedDishwasherJob, { technicianId: ids.carol })
 
     expect(res.status).toBe(200)
-    expect(res.body).toMatchObject({ id: ids.unassignedDishwasherJob, technicianId: ids.carol })
+    expect(res.body).toMatchObject({
+      id: ids.unassignedDishwasherJob,
+      technicianId: ids.carol,
+      requiredSkill: 'Dishwashers',
+      skill: { id: ids.dishwashers, name: 'Dishwashers', category: { id: ids.applianceRepair, name: 'Appliance Repair' } },
+    })
     expect(new Date(res.body.assignedAt).getTime()).toBeGreaterThanOrEqual(before - 1000)
     expect(await assignedJobCount(ids.carol)).toBe(1)
 
@@ -164,7 +187,13 @@ describe('PATCH /api/jobs/:id/assignment', () => {
     const res = await assignment(ids.aliceAcJob, { technicianId: null })
 
     expect(res.status).toBe(200)
-    expect(res.body).toMatchObject({ id: ids.aliceAcJob, technicianId: null, assignedAt: null })
+    expect(res.body).toMatchObject({
+      id: ids.aliceAcJob,
+      technicianId: null,
+      assignedAt: null,
+      requiredSkill: 'Air Conditioning',
+      skill: { id: ids.airConditioning, name: 'Air Conditioning', category: { id: ids.hvac, name: 'HVAC' } },
+    })
     expect(await assignedJobCount(ids.alice)).toBe(1)
   })
 
