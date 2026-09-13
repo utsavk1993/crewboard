@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TechnicianSheet, type TechnicianSheetProps } from '@/components/dashboard/technician-sheet'
+import { formatDate } from '@/lib/format'
 import type { Job, Technician } from '@/lib/types'
 import { makeLocation, makeSpecialty } from '@/test/factories'
 
@@ -8,25 +9,29 @@ const technician: Technician = {
   id: 't1',
   name: 'Ada Lovelace',
   email: 'ada@example.com',
-  phone: '555-0100',
+  phone: '604-555-0100',
   designation: 'Senior Technician',
-  region: 'North',
-  skills: ['Electrical', 'HVAC'],
-  specialties: [makeSpecialty('Electrical', 'Trades'), makeSpecialty('HVAC', 'Trades')],
-  location: makeLocation('North'),
+  region: 'Metro Vancouver',
+  skills: ['EV Chargers', 'Panel Upgrades', 'Heat Pumps'],
+  specialties: [
+    makeSpecialty('EV Chargers', 'Electrical'),
+    makeSpecialty('Panel Upgrades', 'Electrical'),
+    makeSpecialty('Heat Pumps', 'HVAC'),
+  ],
+  location: makeLocation('Surrey'),
   assignedJobCount: 2,
 }
 
 const jobs: Job[] = [
   {
     id: 'j1',
-    title: 'Replace breaker panel',
+    title: 'Upgrade electrical panel',
     description: '',
     customerName: 'Alan Turing',
-    address: '1 Main St',
-    requiredSkill: 'Electrical',
-    skill: makeSpecialty('Electrical', 'Trades'),
-    location: makeLocation('Surrey'),
+    address: '8120 No. 3 Rd, Richmond, BC V6Y 2C4',
+    requiredSkill: 'Panel Upgrades',
+    skill: makeSpecialty('Panel Upgrades', 'Electrical'),
+    location: makeLocation('Richmond'),
     priority: 'HIGH',
     scheduledDate: '2026-09-15T00:00:00.000Z',
     technicianId: 't1',
@@ -34,12 +39,12 @@ const jobs: Job[] = [
   },
   {
     id: 'j2',
-    title: 'Service AC unit',
+    title: 'Heat pump short cycling',
     description: '',
     customerName: 'Grace Hopper',
-    address: '2 Side St',
-    requiredSkill: 'HVAC',
-    skill: makeSpecialty('HVAC', 'Trades'),
+    address: '4700 Kingsway, Burnaby, BC V5H 4M1',
+    requiredSkill: 'Heat Pumps',
+    skill: makeSpecialty('Heat Pumps', 'HVAC'),
     location: makeLocation('Burnaby'),
     priority: 'LOW',
     scheduledDate: '2026-09-16T00:00:00.000Z',
@@ -69,6 +74,10 @@ function renderSheet(props: Partial<TechnicianSheetProps> = {}) {
   return { onClose, onAssign, onUnassign }
 }
 
+function assignedJobItems() {
+  return within(screen.getByRole('list', { name: 'Assigned jobs' })).getAllByRole('listitem')
+}
+
 describe('TechnicianSheet', () => {
   it('shows technician details and assigned jobs, and unassigns the chosen job', async () => {
     const user = userEvent.setup()
@@ -77,17 +86,57 @@ describe('TechnicianSheet', () => {
     expect(screen.getByRole('heading', { name: 'Ada Lovelace' })).toBeInTheDocument()
     expect(screen.getByText('Senior Technician')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'ada@example.com' })).toHaveAttribute('href', 'mailto:ada@example.com')
-    expect(screen.getByRole('link', { name: '555-0100' })).toHaveAttribute('href', 'tel:555-0100')
+    expect(screen.getByRole('link', { name: '604-555-0100' })).toHaveAttribute('href', 'tel:604-555-0100')
     expect(screen.getByRole('meter', { name: 'Ada Lovelace workload' })).toBeInTheDocument()
 
-    const items = within(screen.getByRole('list', { name: 'Assigned jobs' })).getAllByRole('listitem')
+    const items = assignedJobItems()
     expect(items).toHaveLength(2)
-    expect(items[0]).toHaveTextContent('Replace breaker panel')
-    expect(items[1]).toHaveTextContent('Service AC unit')
+    expect(items[0]).toHaveTextContent('Upgrade electrical panel')
+    expect(items[1]).toHaveTextContent('Heat pump short cycling')
 
     await user.click(within(items[1]).getByRole('button', { name: /^Unassign/ }))
     expect(onUnassign).toHaveBeenCalledTimes(1)
     expect(onUnassign).toHaveBeenCalledWith(jobs[1])
+  })
+
+  it('groups the technician’s skills by category', () => {
+    renderSheet()
+
+    const groups = screen.getAllByRole('group')
+    expect(groups).toHaveLength(2)
+    expect(groups[0]).toHaveAccessibleName('Electrical')
+    expect(groups[1]).toHaveAccessibleName('HVAC')
+
+    const electrical = screen.getByRole('group', { name: 'Electrical' })
+    expect(within(electrical).getByText('EV Chargers')).toBeInTheDocument()
+    expect(within(electrical).getByText('Panel Upgrades')).toBeInTheDocument()
+    expect(within(electrical).queryByText('Heat Pumps')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: 'HVAC' })).getByText('Heat Pumps')).toBeInTheDocument()
+  })
+
+  it('shows the technician’s full location instead of the legacy region', () => {
+    renderSheet()
+
+    expect(screen.getByRole('img', { name: 'Surrey, Metro Vancouver, BC' })).toBeInTheDocument()
+  })
+
+  it('shows each job’s category and specialty, city and scheduled date', () => {
+    renderSheet()
+
+    const [panel, heatPump] = assignedJobItems()
+    expect(panel).toHaveTextContent('Alan Turing · 8120 No. 3 Rd, Richmond, BC V6Y 2C4')
+
+    // The chevron between category and specialty is decorative; assistive tech hears a comma instead.
+    const skill = within(panel).getByText('Panel Upgrades').parentElement!
+    expect(skill).toHaveTextContent(/^Electrical, Panel Upgrades$/)
+    skill.querySelectorAll('svg').forEach((icon) => expect(icon).toHaveAttribute('aria-hidden', 'true'))
+
+    expect(within(panel).getByText('Richmond')).toBeInTheDocument()
+    expect(within(panel).getByText(`Scheduled ${formatDate(jobs[0].scheduledDate)}`)).toBeInTheDocument()
+
+    expect(within(heatPump).getByText('Heat Pumps').parentElement).toHaveTextContent(/^HVAC, Heat Pumps$/)
+    expect(within(heatPump).getByText('Burnaby')).toBeInTheDocument()
+    expect(within(heatPump).getByText(`Scheduled ${formatDate(jobs[1].scheduledDate)}`)).toBeInTheDocument()
   })
 
   it('shows an empty state when no jobs are assigned', () => {
@@ -101,7 +150,7 @@ describe('TechnicianSheet', () => {
   it('shows a spinner on the pending job and disables every unassign button', () => {
     renderSheet({ pendingJobId: 'j1' })
 
-    const items = within(screen.getByRole('list', { name: 'Assigned jobs' })).getAllByRole('listitem')
+    const items = assignedJobItems()
     expect(within(items[0]).getByRole('status')).toBeInTheDocument()
     expect(within(items[1]).queryByRole('status')).not.toBeInTheDocument()
 

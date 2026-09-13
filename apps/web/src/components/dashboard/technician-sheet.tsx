@@ -1,7 +1,17 @@
 import type { ReactNode } from 'react'
-import { CalendarDaysIcon, CircleAlertIcon, MailIcon, MapPinIcon, PhoneIcon, PlusIcon, type LucideIcon } from 'lucide-react'
+import {
+  CalendarDaysIcon,
+  ChevronRightIcon,
+  CircleAlertIcon,
+  MailIcon,
+  MapPinIcon,
+  PhoneIcon,
+  PlusIcon,
+  type LucideIcon,
+} from 'lucide-react'
+import { LocationLabel } from '@/components/dashboard/location-label'
 import { PriorityBadge } from '@/components/dashboard/priority-badge'
-import { SkillBadge } from '@/components/dashboard/skill-badge'
+import { SkillGroups } from '@/components/dashboard/skill-groups'
 import { TechnicianAvatar } from '@/components/dashboard/technician-avatar'
 import { WorkloadMeter } from '@/components/dashboard/workload-meter'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -12,6 +22,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { formatDate } from '@/lib/format'
+import { formatLocation } from '@/lib/location'
 import type { Job, Technician } from '@/lib/types'
 
 export type TechnicianSheetProps = {
@@ -106,9 +117,19 @@ function AssignedJobs({ jobs, loading, error, pendingJobId, onUnassign }: Assign
             {job.customerName} · {job.address}
           </p>
           <div className="mt-2 flex items-center justify-between gap-3">
-            {/* The calendar icon separates skill and date, so a wrap on narrow screens never strands a "·". */}
-            <p className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-              <span>{job.requiredSkill}</span>
+            {/* Each item leads with its own icon instead of a "·" separator, so a wrap on narrow screens never strands one. */}
+            <p className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span className="inline-flex min-w-0 items-center gap-1">
+                <span className="truncate">{job.skill.category.name}</span>
+                <ChevronRightIcon aria-hidden="true" className="size-3 shrink-0" />
+                {/* Screen readers skip the chevron, so they hear "Electrical, Panel Upgrades". */}
+                <span className="sr-only">, </span>
+                <span className="truncate">{job.skill.name}</span>
+              </span>
+              <span className="inline-flex min-w-0 items-center gap-1">
+                <MapPinIcon aria-hidden="true" className="size-3.5 shrink-0" />
+                <span className="truncate">{formatLocation(job.location)}</span>
+              </span>
               <span className="inline-flex items-center gap-1 whitespace-nowrap tabular-nums">
                 <CalendarDaysIcon aria-hidden="true" className="size-3.5" />
                 Scheduled {formatDate(job.scheduledDate)}
@@ -171,16 +192,15 @@ export function TechnicianSheet({
                       {technician.phone}
                     </a>
                   </ContactRow>
-                  <ContactRow icon={MapPinIcon}>
-                    <span className="truncate">{technician.region}</span>
-                  </ContactRow>
+                  {/* Matching the contact rows' icon size and text offset keeps the three rows on one grid. */}
+                  <LocationLabel
+                    location={technician.location}
+                    detail="full"
+                    className="[&>svg:first-child]:mr-1 [&>svg:first-child]:size-4"
+                  />
                 </div>
 
-                <div className="flex flex-wrap gap-1.5">
-                  {technician.skills.map((skill) => (
-                    <SkillBadge key={skill} skill={skill} />
-                  ))}
-                </div>
+                <SkillGroups specialties={technician.specialties} />
 
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-muted-foreground">Workload</span>
