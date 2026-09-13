@@ -8,10 +8,10 @@ const DESIGNATIONS = ['Apprentice Technician', 'Technician', 'Senior Technician'
 
 // Days since hire by designation, so apprentices are recent hires and leads have been around for years.
 const TENURE_DAYS: Record<string, [min: number, max: number]> = {
-  'Apprentice Technician': [20, 540],
-  Technician: [300, 6 * 365],
+  'Apprentice Technician': [30, 2 * 365],
+  Technician: [365, 6 * 365],
   'Senior Technician': [4 * 365, 10 * 365],
-  'Lead Technician': [7 * 365, 12 * 365],
+  'Lead Technician': [9 * 365, 12 * 365],
 }
 
 // House number range, postal code prefixes (forward sortation areas) and real streets, so addresses fit the city.
