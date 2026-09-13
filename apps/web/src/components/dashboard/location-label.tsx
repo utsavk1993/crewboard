@@ -23,15 +23,16 @@ export function LocationLabel({ location, detail = 'city', className }: Location
         <span aria-hidden="true" className="shrink-0 text-muted-foreground">
           ·
         </span>
-        <span className="min-w-0 shrink-[3] truncate text-muted-foreground">{location.region.name}</span>
+        <span className="min-w-[4ch] shrink-[3] truncate text-muted-foreground">{location.region.name}</span>
       </span>
     )
   }
 
   const trail = [
-    { key: 'province', name: location.province.name, className: 'shrink-[3] text-muted-foreground' },
-    { key: 'region', name: location.region.name, className: 'shrink-[2] text-muted-foreground' },
-    { key: 'city', name: location.city.name, className: '' },
+    // Muted parts keep a few characters so a cramped trail still reads as three places.
+    { key: 'province', name: location.province.name, className: 'min-w-[4ch] shrink-[3] text-muted-foreground' },
+    { key: 'region', name: location.region.name, className: 'min-w-[4ch] shrink-[2] text-muted-foreground' },
+    { key: 'city', name: location.city.name, className: 'min-w-0' },
   ]
 
   return (
@@ -46,7 +47,7 @@ export function LocationLabel({ location, detail = 'city', className }: Location
       {trail.map((part, index) => (
         <Fragment key={part.key}>
           {index > 0 && <ChevronRightIcon aria-hidden="true" className="size-3 shrink-0 text-muted-foreground" />}
-          <span className={cn('min-w-0 truncate', part.className)}>{part.name}</span>
+          <span className={cn('truncate', part.className)}>{part.name}</span>
         </Fragment>
       ))}
     </span>
