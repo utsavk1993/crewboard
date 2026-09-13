@@ -106,7 +106,17 @@ function TechnicianCell({ technician }: { technician: Technician }) {
 
 const specialtyNames = (group: SpecialtyGroup) => group.specialties.map((specialty) => specialty.name).join(', ')
 
-function BadgeWithTooltip({ label, srLabel, children }: { label: string; srLabel: string; children: ReactNode }) {
+// The accessible name starts with the visible label and carries the tooltip's text, so screen reader
+// users get the details without opening it.
+function BadgeWithTooltip({
+  label,
+  accessibleName,
+  children,
+}: {
+  label: string
+  accessibleName: string
+  children: ReactNode
+}) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -116,9 +126,8 @@ function BadgeWithTooltip({ label, srLabel, children }: { label: string; srLabel
           variant="outline"
           className="font-normal text-muted-foreground hover:bg-accent hover:text-accent-foreground"
         >
-          <button type="button">
+          <button type="button" aria-label={accessibleName}>
             {label}
-            <span className="sr-only">{srLabel}</span>
           </button>
         </Badge>
       </TooltipTrigger>
@@ -139,14 +148,18 @@ function SkillCategories({ specialties }: { specialties: Specialty[] }) {
   return (
     <div className="flex items-center gap-1">
       {visible.map((group) => (
-        <BadgeWithTooltip key={group.category.id} label={group.category.name} srLabel={`: ${specialtyNames(group)}`}>
+        <BadgeWithTooltip
+          key={group.category.id}
+          label={group.category.name}
+          accessibleName={`${group.category.name}: ${specialtyNames(group)}`}
+        >
           {specialtyNames(group)}
         </BadgeWithTooltip>
       ))}
       {overflow.length > 0 && (
         <BadgeWithTooltip
           label={`+${overflow.length}`}
-          srLabel={` more ${overflow.length === 1 ? 'category' : 'categories'}: ${overflow
+          accessibleName={`+${overflow.length} more ${overflow.length === 1 ? 'category' : 'categories'}: ${overflow
             .map((group) => `${group.category.name}: ${specialtyNames(group)}`)
             .join('; ')}`}
         >
