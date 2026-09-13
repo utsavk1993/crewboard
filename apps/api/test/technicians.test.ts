@@ -11,29 +11,44 @@ const metroVancouver = (city: { id: string; name: string }) => ({
   province: { code: 'BC', name: 'British Columbia' },
 })
 
+const alice = {
+  id: ids.alice,
+  name: 'Alice Nguyen',
+  email: 'alice@test.example',
+  phone: '(555) 010-0001',
+  designation: 'Senior Technician',
+  hiredOn: '2016-03-14T00:00:00.000Z',
+  region: 'Surrey',
+  location: metroVancouver({ id: ids.surrey, name: 'Surrey' }),
+  skills: ['Panel Upgrades', 'Air Conditioning'],
+  specialties: [
+    { id: ids.panelUpgrades, name: 'Panel Upgrades', category: { id: ids.electrical, name: 'Electrical' } },
+    { id: ids.airConditioning, name: 'Air Conditioning', category: { id: ids.hvac, name: 'HVAC' } },
+  ],
+  assignedJobCount: 2,
+}
+
 describe('GET /api/technicians', () => {
-  it('lists technicians sorted by name with their specialties and assigned job count', async () => {
+  it('lists technicians sorted by name with their specialties, assigned job count and hire date', async () => {
     const res = await request(app).get('/api/technicians')
 
     expect(res.status).toBe(200)
     expect(res.body).toEqual([
-      {
-        id: ids.alice,
-        name: 'Alice Nguyen',
-        email: 'alice@test.example',
-        phone: '(555) 010-0001',
-        designation: 'Senior Technician',
-        region: 'Surrey',
-        location: metroVancouver({ id: ids.surrey, name: 'Surrey' }),
-        skills: ['Panel Upgrades', 'Air Conditioning'],
-        specialties: [
-          { id: ids.panelUpgrades, name: 'Panel Upgrades', category: { id: ids.electrical, name: 'Electrical' } },
-          { id: ids.airConditioning, name: 'Air Conditioning', category: { id: ids.hvac, name: 'HVAC' } },
-        ],
-        assignedJobCount: 2,
-      },
-      expect.objectContaining({ id: ids.bob, name: 'Bob Martinez', skills: ['Water Heaters'], assignedJobCount: 1 }),
-      expect.objectContaining({ id: ids.carol, name: 'Carol Smith', skills: ['Dishwashers'], assignedJobCount: 0 }),
+      alice,
+      expect.objectContaining({
+        id: ids.bob,
+        name: 'Bob Martinez',
+        skills: ['Water Heaters'],
+        assignedJobCount: 1,
+        hiredOn: '2021-09-07T00:00:00.000Z',
+      }),
+      expect.objectContaining({
+        id: ids.carol,
+        name: 'Carol Smith',
+        skills: ['Dishwashers'],
+        assignedJobCount: 0,
+        hiredOn: '2025-06-02T00:00:00.000Z',
+      }),
     ])
   })
 
@@ -81,5 +96,37 @@ describe('GET /api/technicians', () => {
       skills: [],
       specialties: [],
     })
+  })
+})
+
+describe('GET /api/technicians/:id', () => {
+  it('returns one technician with specialties, location, assigned job count and hire date', async () => {
+    const res = await request(app).get(`/api/technicians/${ids.alice}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual(alice)
+  })
+
+  it('returns the same shape as the list item', async () => {
+    const [detail, list] = await Promise.all([
+      request(app).get(`/api/technicians/${ids.carol}`),
+      request(app).get('/api/technicians'),
+    ])
+
+    expect(detail.body).toEqual(list.body.find((technician: { id: string }) => technician.id === ids.carol))
+  })
+
+  it('returns 404 for an unknown technician', async () => {
+    const res = await request(app).get('/api/technicians/99999999-9999-4999-8999-999999999999')
+
+    expect(res.status).toBe(404)
+    expect(res.body).toEqual({ error: { code: 'TECHNICIAN_NOT_FOUND', message: 'Technician not found.' } })
+  })
+
+  it('returns 400 for an id that is not a UUID', async () => {
+    const res = await request(app).get('/api/technicians/not-a-uuid')
+
+    expect(res.status).toBe(400)
+    expect(res.body).toEqual({ error: { code: 'VALIDATION_ERROR', message: 'Technician id must be a valid UUID.' } })
   })
 })

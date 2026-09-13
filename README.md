@@ -78,7 +78,8 @@ Technicians include `specialties: { id, name, category: { id, name } }[]` (sorte
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/api/health` | API and database health |
-| GET | `/api/technicians` | Technicians with `assignedJobCount`, sorted by name |
+| GET | `/api/technicians` | Technicians with `assignedJobCount` and `hiredOn`, sorted by name |
+| GET | `/api/technicians/:id` | One technician, in the same shape as a list item |
 | GET | `/api/jobs` | All jobs, by scheduled date, then priority |
 | GET | `/api/jobs?unassigned=true` | Jobs with no technician |
 | GET | `/api/jobs?technicianId=<uuid>` | Jobs held by one technician |
