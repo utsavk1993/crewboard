@@ -1,4 +1,9 @@
 import '@testing-library/jest-dom'
+import { TextDecoder, TextEncoder } from 'node:util'
+
+// jsdom has no TextEncoder/TextDecoder; React Router uses them when its module loads.
+globalThis.TextEncoder ??= TextEncoder as typeof globalThis.TextEncoder
+globalThis.TextDecoder ??= TextDecoder as typeof globalThis.TextDecoder
 
 // jsdom has no matchMedia; theme and responsive code query it on mount.
 // Configurable so individual tests can redefine it to simulate a media query match.
