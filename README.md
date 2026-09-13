@@ -59,12 +59,16 @@ Run from the repository root.
 
 ### Data model
 
-- **technicians**: name, email (unique), phone, designation, region, skills
-- **jobs**: title, description, customer, address, required skill, priority (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), scheduled date, nullable `technician_id`, `assigned_at`
+- **skill_categories**: name (unique), e.g. Appliance Repair
+- **skills**: a specialty within a category, e.g. Appliance Repair › Refrigerators; name (globally unique), `category_id`
+- **technicians**: name, email (unique), phone, designation, region; specialties through **technician_skills** (`technician_id`, `skill_id`)
+- **jobs**: title, description, customer, address, required specialty (`skill_id`), priority (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), scheduled date, nullable `technician_id`, `assigned_at`
 
 A technician has many jobs and a job has at most one technician, so the foreign key lives on `jobs`; `technician_id = NULL` means unassigned. A technician's load is the number of jobs they hold.
 
-The seed creates 12 technicians with a deliberately uneven workload and 40 jobs (24 assigned, 16 unassigned). Assigned jobs always match a skill the technician has.
+The seed creates 7 skill categories with 30 specialties, 12 technicians with a deliberately uneven workload and 2–5 specialties from one or two categories each, and 40 jobs (24 assigned, 16 unassigned). Assigned jobs always require a specialty the technician has.
+
+Technicians include `specialties: { id, name, category: { id, name } }[]` (sorted by category, then specialty) and jobs include `skill: { id, name, category: { id, name } }`. The older `skills` (specialty names) and `requiredSkill` (specialty name) fields are still returned.
 
 ### API
 
