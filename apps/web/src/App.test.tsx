@@ -8,6 +8,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { api, ApiError } from '@/lib/api'
 import type { Job, Technician } from '@/lib/types'
+import { makeLocation, makeSpecialty } from '@/test/factories'
 
 jest.mock('@/lib/api', () => ({
   ...jest.requireActual('@/lib/api'),
@@ -26,6 +27,8 @@ function makeJob(fields: Pick<Job, 'id' | 'title' | 'requiredSkill'> & Partial<J
     description: '',
     customerName: 'Grace Hopper',
     address: '1 Main St',
+    skill: makeSpecialty(fields.requiredSkill, 'Trades'),
+    location: makeLocation('Surrey'),
     priority: 'MEDIUM',
     scheduledDate: '2026-09-15T00:00:00.000Z',
     technicianId: null,
@@ -42,6 +45,8 @@ const ada: Technician = {
   designation: 'Senior Technician',
   region: 'North',
   skills: ['Electrical'],
+  specialties: [makeSpecialty('Electrical', 'Trades')],
+  location: makeLocation('North'),
   assignedJobCount: 1,
 }
 const alan: Technician = { ...ada, id: 'alan', name: 'Alan Turing', email: 'alan@crewboard.test', assignedJobCount: 0 }

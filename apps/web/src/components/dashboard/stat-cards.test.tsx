@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import { computeStats, StatCards } from '@/components/dashboard/stat-cards'
 import type { Job, Priority, Technician } from '@/lib/types'
+import { makeLocation, makeSpecialty } from '@/test/factories'
 
 function technician(id: string, assignedJobCount: number): Technician {
   return {
@@ -11,6 +12,8 @@ function technician(id: string, assignedJobCount: number): Technician {
     designation: 'Field Technician',
     region: 'North',
     skills: ['HVAC'],
+    specialties: [makeSpecialty('HVAC', 'Trades')],
+    location: makeLocation('North'),
     assignedJobCount,
   }
 }
@@ -23,6 +26,8 @@ function job(id: string, priority: Priority): Job {
     customerName: 'Acme Co',
     address: '1 Main St',
     requiredSkill: 'HVAC',
+    skill: makeSpecialty('HVAC', 'Trades'),
+    location: makeLocation('Surrey'),
     priority,
     scheduledDate: '2026-09-15T00:00:00.000Z',
     technicianId: null,

@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TechnicianSheet, type TechnicianSheetProps } from '@/components/dashboard/technician-sheet'
 import type { Job, Technician } from '@/lib/types'
+import { makeLocation, makeSpecialty } from '@/test/factories'
 
 const technician: Technician = {
   id: 't1',
@@ -11,6 +12,8 @@ const technician: Technician = {
   designation: 'Senior Technician',
   region: 'North',
   skills: ['Electrical', 'HVAC'],
+  specialties: [makeSpecialty('Electrical', 'Trades'), makeSpecialty('HVAC', 'Trades')],
+  location: makeLocation('North'),
   assignedJobCount: 2,
 }
 
@@ -22,6 +25,8 @@ const jobs: Job[] = [
     customerName: 'Alan Turing',
     address: '1 Main St',
     requiredSkill: 'Electrical',
+    skill: makeSpecialty('Electrical', 'Trades'),
+    location: makeLocation('Surrey'),
     priority: 'HIGH',
     scheduledDate: '2026-09-15T00:00:00.000Z',
     technicianId: 't1',
@@ -34,6 +39,8 @@ const jobs: Job[] = [
     customerName: 'Grace Hopper',
     address: '2 Side St',
     requiredSkill: 'HVAC',
+    skill: makeSpecialty('HVAC', 'Trades'),
+    location: makeLocation('Burnaby'),
     priority: 'LOW',
     scheduledDate: '2026-09-16T00:00:00.000Z',
     technicianId: 't1',

@@ -1,5 +1,6 @@
 import { api, ApiError, errorMessage } from '@/lib/api'
 import type { Technician } from '@/lib/types'
+import { makeLocation, makeSpecialty } from '@/test/factories'
 
 const technician: Technician = {
   id: 't1',
@@ -9,6 +10,8 @@ const technician: Technician = {
   designation: 'Senior Technician',
   region: 'North',
   skills: ['Electrical'],
+  specialties: [makeSpecialty('Electrical', 'Trades')],
+  location: makeLocation('North'),
   assignedJobCount: 2,
 }
 
