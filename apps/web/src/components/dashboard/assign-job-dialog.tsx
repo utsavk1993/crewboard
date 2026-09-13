@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Check, CircleAlert, Inbox, Search, SearchX } from 'lucide-react'
+import { Check, CircleAlert, Inbox, MapPin, Search, SearchX } from 'lucide-react'
+import { LocationLabel } from '@/components/dashboard/location-label'
 import { PriorityBadge } from '@/components/dashboard/priority-badge'
 import { SkillBadge } from '@/components/dashboard/skill-badge'
 import { WorkloadMeter } from '@/components/dashboard/workload-meter'
@@ -18,10 +19,9 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { formatDate } from '@/lib/format'
-import type { Job, Priority, Technician } from '@/lib/types'
+import { rankJobsForTechnician, type JobMatch, type RankedJob } from '@/lib/job-ranking'
+import type { Job, Technician } from '@/lib/types'
 import { cn } from '@/lib/utils'
-
-const priorityRank: Record<Priority, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 }
 
 export type AssignJobDialogProps = {
   open: boolean
@@ -34,6 +34,17 @@ export type AssignJobDialogProps = {
   onClose: () => void
   onAssign: (job: Job) => void
 }
+
+const matchesSearch = (job: Job, term: string) =>
+  [
+    job.title,
+    job.customerName,
+    job.address,
+    job.skill.name,
+    job.skill.category.name,
+    job.location.city.name,
+    job.location.region.name,
+  ].some((value) => value.toLowerCase().includes(term))
 
 export function AssignJobDialog({
   open,
@@ -48,28 +59,16 @@ export function AssignJobDialog({
   const [search, setSearch] = useState('')
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
 
-  const skills = technician?.skills ?? []
-  const matchesSkill = (job: Job) => skills.includes(job.requiredSkill)
   const term = search.trim().toLowerCase()
+  const searchedJobs = term ? jobs.filter((job) => matchesSearch(job, term)) : jobs
 
-  // Jobs the technician is qualified for first, then most urgent, then soonest.
-  const visibleJobs = jobs
-    .filter(
-      (job) =>
-        !term ||
-        [job.title, job.customerName, job.address, job.requiredSkill].some((value) =>
-          value.toLowerCase().includes(term),
-        ),
-    )
-    .sort(
-      (a, b) =>
-        Number(matchesSkill(b)) - Number(matchesSkill(a)) ||
-        priorityRank[a.priority] - priorityRank[b.priority] ||
-        a.scheduledDate.localeCompare(b.scheduledDate),
-    )
+  // The best-suited, closest jobs first; see rankJobsForTechnician for the full order.
+  const visibleJobs: RankedJob[] = technician
+    ? rankJobsForTechnician(searchedJobs, technician)
+    : searchedJobs.map((job) => ({ job, match: { skill: null, proximity: null } }))
 
   // Only a job that is still visible can be assigned, so a search can't hide what the button will assign.
-  const selectedJob = visibleJobs.find((job) => job.id === selectedJobId)
+  const selectedJob = visibleJobs.find(({ job }) => job.id === selectedJobId)?.job
 
   // An in-flight assignment can't be abandoned: the request would still land after the dialog closed.
   const preventWhileSubmitting = (event: Event) => {
@@ -99,16 +98,19 @@ export function AssignJobDialog({
             )}
           </DialogDescription>
           {technician && (
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-1">
-              <ul role="list" aria-label="Skills" className="flex flex-wrap gap-1.5">
-                {technician.skills.map((skill) => (
-                  <li key={skill}>
-                    <SkillBadge skill={skill} />
-                  </li>
-                ))}
-              </ul>
-              <WorkloadMeter count={jobCount} name={technician.name} />
-            </div>
+            <>
+              <LocationLabel location={technician.location} detail="full" className="text-sm" />
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-1">
+                <ul role="list" aria-label="Skills" className="flex flex-wrap gap-1.5">
+                  {technician.specialties.map((specialty) => (
+                    <li key={specialty.id}>
+                      <SkillBadge skill={specialty.name} />
+                    </li>
+                  ))}
+                </ul>
+                <WorkloadMeter count={jobCount} name={technician.name} />
+              </div>
+            </>
           )}
         </DialogHeader>
 
@@ -159,7 +161,7 @@ export function AssignJobDialog({
               aria-label="Available jobs"
               className="-mx-1 flex max-h-[min(24rem,50vh)] min-h-0 flex-col gap-1.5 overflow-y-auto p-1"
             >
-              {visibleJobs.map((job) => {
+              {visibleJobs.map(({ job, match }) => {
                 const selected = job.id === selectedJobId
                 return (
                   <li key={job.id}>
@@ -185,13 +187,8 @@ export function AssignJobDialog({
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span className="mr-auto font-medium">{job.title}</span>
-                          <span className="flex items-center gap-1.5">
-                            {matchesSkill(job) && (
-                              <Badge variant="success">
-                                <Check aria-hidden="true" />
-                                Skill match
-                              </Badge>
-                            )}
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            <MatchBadges match={match} />
                             <PriorityBadge priority={job.priority} />
                           </span>
                         </span>
@@ -199,7 +196,8 @@ export function AssignJobDialog({
                           {job.customerName} · {job.address}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {job.requiredSkill} · Scheduled {formatDate(job.scheduledDate)}
+                          {job.skill.category.name} › {job.skill.name} · {job.location.city.name} · Scheduled{' '}
+                          {formatDate(job.scheduledDate)}
                         </span>
                       </span>
                     </button>
@@ -233,6 +231,27 @@ export function AssignJobDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function MatchBadges({ match }: { match: JobMatch }) {
+  return (
+    <>
+      {match.skill === 'specialty' && (
+        <Badge variant="success">
+          <Check aria-hidden="true" />
+          Skill match
+        </Badge>
+      )}
+      {match.skill === 'category' && <Badge variant="info">Related skill</Badge>}
+      {/* Sharing only a province is too broad to be worth calling out. */}
+      {(match.proximity === 'city' || match.proximity === 'region') && (
+        <Badge variant="outline">
+          <MapPin aria-hidden="true" className="text-muted-foreground" />
+          {match.proximity === 'city' ? 'Same city' : 'Same region'}
+        </Badge>
+      )}
+    </>
   )
 }
 

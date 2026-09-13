@@ -1,8 +1,16 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AssignJobDialog, type AssignJobDialogProps } from '@/components/dashboard/assign-job-dialog'
+import { formatDate } from '@/lib/format'
 import type { Job, Technician } from '@/lib/types'
 import { makeLocation, makeSpecialty } from '@/test/factories'
+
+const alberta = { code: 'AB', name: 'Alberta' }
+
+const panelUpgrades = makeSpecialty('Panel Upgrades', 'Electrical')
+const evChargers = makeSpecialty('EV Chargers', 'Electrical')
+const leakRepair = makeSpecialty('Leak Repair', 'Plumbing')
+const furnaces = makeSpecialty('Furnaces', 'HVAC')
 
 const technician: Technician = {
   id: 't1',
@@ -10,24 +18,24 @@ const technician: Technician = {
   email: 'ada@example.com',
   phone: '555-0100',
   designation: 'Senior Technician',
-  region: 'North',
-  skills: ['Electrical'],
-  specialties: [makeSpecialty('Electrical', 'Trades')],
-  location: makeLocation('North'),
+  region: 'Metro Vancouver',
+  skills: ['Panel Upgrades', 'Furnaces'],
+  specialties: [panelUpgrades, furnaces],
+  location: makeLocation('Surrey'),
   assignedJobCount: 2,
 }
 
 function makeJob(overrides: Partial<Job>): Job {
-  const requiredSkill = overrides.requiredSkill ?? 'HVAC'
+  const skill = overrides.skill ?? leakRepair
   return {
     id: 'job',
     title: 'Job',
     description: '',
     customerName: 'Customer',
     address: '1 Main St',
-    requiredSkill,
-    skill: makeSpecialty(requiredSkill, 'Trades'),
-    location: makeLocation('Surrey'),
+    requiredSkill: skill.name,
+    skill,
+    location: makeLocation('Kelowna', 'Central Okanagan'),
     priority: 'MEDIUM',
     scheduledDate: '2026-09-15T00:00:00.000Z',
     technicianId: null,
@@ -41,14 +49,15 @@ const plumbingJob = makeJob({
   id: 'j1',
   title: 'Fix leaking pipe',
   customerName: 'Grace Hopper',
-  requiredSkill: 'Plumbing',
+  skill: leakRepair,
   priority: 'URGENT',
 })
 const electricalJob = makeJob({
   id: 'j2',
   title: 'Replace breaker panel',
   customerName: 'Alan Turing',
-  requiredSkill: 'Electrical',
+  skill: panelUpgrades,
+  location: makeLocation('Burnaby'),
   priority: 'LOW',
 })
 
@@ -72,6 +81,9 @@ function renderDialog(props: Partial<AssignJobDialogProps> = {}) {
 }
 
 const jobOptions = () => within(screen.getByRole('list', { name: 'Available jobs' })).getAllByRole('button')
+// Match badges only; every row also has a priority badge.
+const matchBadgesOf = (option: HTMLElement) =>
+  Array.from(option.querySelectorAll('[data-slot="badge"]:not([data-priority])'), (badge) => badge.textContent)
 
 describe('AssignJobDialog', () => {
   it('lists jobs matching the technician skills first', () => {
@@ -83,6 +95,59 @@ describe('AssignJobDialog', () => {
     expect(options[0]).toHaveTextContent('Skill match')
     expect(options[1]).toHaveTextContent('Fix leaking pipe')
     expect(options[1]).not.toHaveTextContent('Skill match')
+  })
+
+  it('ranks by skill, then proximity, and badges why each job fits', () => {
+    renderDialog({
+      jobs: [
+        makeJob({ id: 'province', title: 'Unclog drain', location: makeLocation('Kelowna', 'Central Okanagan') }),
+        makeJob({ id: 'region', title: 'Replace shut-off valve', location: makeLocation('Burnaby') }),
+        makeJob({ id: 'related', title: 'Install EV charger', skill: evChargers, location: makeLocation('Surrey') }),
+        makeJob({
+          id: 'specialty',
+          title: 'Upgrade to 200A service',
+          skill: panelUpgrades,
+          location: makeLocation('Calgary', 'Calgary Region', alberta),
+        }),
+        makeJob({ id: 'nearby-specialty', title: 'Tune up furnace', skill: furnaces, location: makeLocation('Surrey') }),
+      ],
+    })
+
+    const options = jobOptions()
+    expect(options.map((option) => option.textContent)).toEqual([
+      expect.stringContaining('Tune up furnace'),
+      expect.stringContaining('Upgrade to 200A service'),
+      expect.stringContaining('Install EV charger'),
+      expect.stringContaining('Replace shut-off valve'),
+      expect.stringContaining('Unclog drain'),
+    ])
+    expect(options.map(matchBadgesOf)).toEqual([
+      ['Skill match', 'Same city'],
+      ['Skill match'],
+      ['Related skill', 'Same city'],
+      ['Same region'],
+      [],
+    ])
+  })
+
+  it('shows the category, specialty, city and scheduled date of each job', () => {
+    renderDialog()
+
+    expect(jobOptions()[0]).toHaveTextContent(
+      `Electrical › Panel Upgrades · Burnaby · Scheduled ${formatDate(electricalJob.scheduledDate)}`,
+    )
+  })
+
+  it('shows where the technician is based and their skills', () => {
+    renderDialog()
+
+    const dialog = screen.getByRole('dialog', { name: 'Assign job to Ada Lovelace' })
+    expect(within(dialog).getByRole('img', { name: 'Surrey, Metro Vancouver, BC' })).toBeInTheDocument()
+    expect(
+      within(within(dialog).getByRole('list', { name: 'Skills' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Panel Upgrades', 'Furnaces'])
   })
 
   it('enables assigning once a job is selected and passes that job to onAssign', async () => {
@@ -105,13 +170,24 @@ describe('AssignJobDialog', () => {
     const user = userEvent.setup()
     renderDialog()
 
-    await user.type(screen.getByRole('textbox', { name: 'Search jobs' }), 'grace')
-    const options = jobOptions()
+    const search = screen.getByRole('textbox', { name: 'Search jobs' })
+    await user.type(search, 'grace')
+    let options = jobOptions()
     expect(options).toHaveLength(1)
     expect(options[0]).toHaveTextContent('Fix leaking pipe')
 
-    await user.clear(screen.getByRole('textbox', { name: 'Search jobs' }))
-    await user.type(screen.getByRole('textbox', { name: 'Search jobs' }), 'no such job')
+    await user.clear(search)
+    await user.type(search, 'burnaby')
+    options = jobOptions()
+    expect(options).toHaveLength(1)
+    expect(options[0]).toHaveTextContent('Replace breaker panel')
+
+    await user.clear(search)
+    await user.type(search, 'plumbing')
+    expect(jobOptions()).toHaveLength(1)
+
+    await user.clear(search)
+    await user.type(search, 'no such job')
     expect(screen.queryByRole('list', { name: 'Available jobs' })).not.toBeInTheDocument()
     expect(screen.getByText('No jobs match your search.')).toBeInTheDocument()
   })
