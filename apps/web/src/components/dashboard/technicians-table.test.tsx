@@ -2,14 +2,19 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TechniciansTable, type TechniciansTableProps } from '@/components/dashboard/technicians-table'
 import type { Technician } from '@/lib/types'
+import { makeLocation, makeSpecialty } from '@/test/factories'
 
 function technician(fields: Pick<Technician, 'id' | 'name'> & Partial<Technician>): Technician {
+  const region = fields.region ?? 'North'
+  const skills = fields.skills ?? ['HVAC']
   return {
     email: `${fields.id}@crewboard.test`,
     phone: '555-0100',
     designation: 'Field Technician',
-    region: 'North',
-    skills: ['HVAC'],
+    region,
+    skills,
+    specialties: skills.map((skill) => makeSpecialty(skill, 'Trades')),
+    location: makeLocation(region),
     assignedJobCount: 0,
     ...fields,
   }

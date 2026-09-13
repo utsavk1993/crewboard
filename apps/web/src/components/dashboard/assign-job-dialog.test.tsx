@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AssignJobDialog, type AssignJobDialogProps } from '@/components/dashboard/assign-job-dialog'
 import type { Job, Technician } from '@/lib/types'
+import { makeLocation, makeSpecialty } from '@/test/factories'
 
 const technician: Technician = {
   id: 't1',
@@ -11,17 +12,22 @@ const technician: Technician = {
   designation: 'Senior Technician',
   region: 'North',
   skills: ['Electrical'],
+  specialties: [makeSpecialty('Electrical', 'Trades')],
+  location: makeLocation('North'),
   assignedJobCount: 2,
 }
 
 function makeJob(overrides: Partial<Job>): Job {
+  const requiredSkill = overrides.requiredSkill ?? 'HVAC'
   return {
     id: 'job',
     title: 'Job',
     description: '',
     customerName: 'Customer',
     address: '1 Main St',
-    requiredSkill: 'HVAC',
+    requiredSkill,
+    skill: makeSpecialty(requiredSkill, 'Trades'),
+    location: makeLocation('Surrey'),
     priority: 'MEDIUM',
     scheduledDate: '2026-09-15T00:00:00.000Z',
     technicianId: null,
