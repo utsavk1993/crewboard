@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router'
 import { App } from '@/App'
 import { ThemeProvider } from '@/components/theme/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
@@ -70,17 +71,19 @@ afterEach(() => {
   jest.clearAllMocks()
 })
 
-function renderApp() {
+function renderApp(path = '/') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
-    <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <App />
-        </TooltipProvider>
-      </QueryClientProvider>
-      <Toaster />
-    </ThemeProvider>,
+    <MemoryRouter initialEntries={[path]}>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <App />
+          </TooltipProvider>
+        </QueryClientProvider>
+        <Toaster />
+      </ThemeProvider>
+    </MemoryRouter>,
   )
   return userEvent.setup()
 }
@@ -93,6 +96,7 @@ describe('App', () => {
 
     expect(screen.getByRole('banner')).toHaveTextContent('Crewboard')
     expect(screen.getByRole('heading', { name: 'Dispatch board', level: 1 })).toBeInTheDocument()
+    expect(document.title).toBe('Dispatch board · Crewboard')
 
     const table = await screen.findByRole('table', { name: 'Technicians' })
     expect(await within(table).findByText('Ada Lovelace')).toBeInTheDocument()
@@ -152,5 +156,29 @@ describe('App', () => {
 
     expect(await screen.findByRole('table', { name: 'Technicians' })).toBeInTheDocument()
     expect(mockApi.getTechnicians).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows a not-found page for unknown paths with a link back to the board', async () => {
+    const user = renderApp('/no-such-page')
+
+    expect(screen.getByRole('banner')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Page not found', level: 1 })).toBeInTheDocument()
+    expect(document.title).toBe('Page not found · Crewboard')
+    expect(mockApi.getTechnicians).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('link', { name: 'Back to dispatch board' }))
+
+    expect(screen.getByRole('heading', { name: 'Dispatch board', level: 1 })).toBeInTheDocument()
+    expect(await screen.findByRole('table', { name: 'Technicians' })).toBeInTheDocument()
+    expect(document.title).toBe('Dispatch board · Crewboard')
+  })
+
+  it('returns to the board from the header brand', async () => {
+    const user = renderApp('/technicians/unknown/extra')
+
+    await user.click(screen.getByRole('link', { name: 'Crewboard home' }))
+
+    expect(screen.queryByRole('heading', { name: 'Page not found' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('table', { name: 'Technicians' })).toBeInTheDocument()
   })
 })
