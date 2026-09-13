@@ -59,16 +59,19 @@ Run from the repository root.
 
 ### Data model
 
+- **provinces**: code (primary key, e.g. `BC`), name (unique)
+- **regions**: a service region within a province, e.g. British Columbia › Metro Vancouver; name (unique per province), `province_code`
+- **cities**: a city within a region, e.g. British Columbia › Metro Vancouver › Surrey; name (unique per region), `region_id`
 - **skill_categories**: name (unique), e.g. Appliance Repair
 - **skills**: a specialty within a category, e.g. Appliance Repair › Refrigerators; name (globally unique), `category_id`
-- **technicians**: name, email (unique), phone, designation, region; specialties through **technician_skills** (`technician_id`, `skill_id`)
-- **jobs**: title, description, customer, address, required specialty (`skill_id`), priority (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), scheduled date, nullable `technician_id`, `assigned_at`
+- **technicians**: name, email (unique), phone, designation, home base (`city_id`); specialties through **technician_skills** (`technician_id`, `skill_id`)
+- **jobs**: title, description, customer, address, job site (`city_id`), required specialty (`skill_id`), priority (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), scheduled date, nullable `technician_id`, `assigned_at`
 
 A technician has many jobs and a job has at most one technician, so the foreign key lives on `jobs`; `technician_id = NULL` means unassigned. A technician's load is the number of jobs they hold.
 
-The seed creates 7 skill categories with 30 specialties, 12 technicians with a deliberately uneven workload and 2–5 specialties from one or two categories each, and 40 jobs (24 assigned, 16 unassigned). Assigned jobs always require a specialty the technician has.
+The seed creates a service geography for a company headquartered in British Columbia with branches in Alberta: 2 provinces, 6 regions and 22 cities (British Columbia › Metro Vancouver, Fraser Valley, Capital Region, Central Okanagan; Alberta › Calgary Region, Edmonton Region). It adds 7 skill categories with 30 specialties, 28 technicians (16 based in Metro Vancouver) with a deliberately uneven workload and 2–5 specialties from one or two categories each, and 88 jobs (52 assigned, 36 unassigned, spread across every region). Job addresses use real street names and postal code prefixes for their city. Assigned jobs always require a specialty the technician has and are usually in the technician's region.
 
-Technicians include `specialties: { id, name, category: { id, name } }[]` (sorted by category, then specialty) and jobs include `skill: { id, name, category: { id, name } }`. The older `skills` (specialty names) and `requiredSkill` (specialty name) fields are still returned.
+Technicians include `specialties: { id, name, category: { id, name } }[]` (sorted by category, then specialty) and jobs include `skill: { id, name, category: { id, name } }`. Both include `location: { city: { id, name }, region: { id, name }, province: { code, name } }`: a technician's home base or a job's site. The older `skills` (specialty names), `requiredSkill` (specialty name) and technician `region` (home base city name) fields are still returned.
 
 ### API
 

@@ -5,6 +5,12 @@ import { ids } from './fixtures'
 
 const app = createApp()
 
+const metroVancouver = (city: { id: string; name: string }) => ({
+  city,
+  region: { id: ids.metroVancouver, name: 'Metro Vancouver' },
+  province: { code: 'BC', name: 'British Columbia' },
+})
+
 describe('GET /api/technicians', () => {
   it('lists technicians sorted by name with their specialties and assigned job count', async () => {
     const res = await request(app).get('/api/technicians')
@@ -17,7 +23,8 @@ describe('GET /api/technicians', () => {
         email: 'alice@test.example',
         phone: '(555) 010-0001',
         designation: 'Senior Technician',
-        region: 'North',
+        region: 'Surrey',
+        location: metroVancouver({ id: ids.surrey, name: 'Surrey' }),
         skills: ['Panel Upgrades', 'Air Conditioning'],
         specialties: [
           { id: ids.panelUpgrades, name: 'Panel Upgrades', category: { id: ids.electrical, name: 'Electrical' } },
@@ -28,6 +35,25 @@ describe('GET /api/technicians', () => {
       expect.objectContaining({ id: ids.bob, name: 'Bob Martinez', skills: ['Water Heaters'], assignedJobCount: 1 }),
       expect.objectContaining({ id: ids.carol, name: 'Carol Smith', skills: ['Dishwashers'], assignedJobCount: 0 }),
     ])
+  })
+
+  it("includes each technician's home base location, with the city name as the legacy region", async () => {
+    const res = await request(app).get('/api/technicians')
+
+    expect(
+      Object.fromEntries(res.body.map((technician: { id: string; region: string; location: unknown }) => [technician.id, [technician.region, technician.location]])),
+    ).toEqual({
+      [ids.alice]: ['Surrey', metroVancouver({ id: ids.surrey, name: 'Surrey' })],
+      [ids.bob]: ['Langley', metroVancouver({ id: ids.langley, name: 'Langley' })],
+      [ids.carol]: [
+        'Kelowna',
+        {
+          city: { id: ids.kelowna, name: 'Kelowna' },
+          region: { id: ids.centralOkanagan, name: 'Central Okanagan' },
+          province: { code: 'BC', name: 'British Columbia' },
+        },
+      ],
+    })
   })
 
   it('sorts specialties by category name, then specialty name', async () => {

@@ -18,6 +18,13 @@ export const ids = {
   waterHeaters: 'dddddddd-0000-4000-8000-000000000003',
   dishwashers: 'dddddddd-0000-4000-8000-000000000004',
   fixturesAndFaucets: 'dddddddd-0000-4000-8000-000000000005',
+  metroVancouver: 'eeeeeeee-0000-4000-8000-000000000001',
+  centralOkanagan: 'eeeeeeee-0000-4000-8000-000000000002',
+  surrey: 'ffffffff-0000-4000-8000-000000000001',
+  burnaby: 'ffffffff-0000-4000-8000-000000000002',
+  langley: 'ffffffff-0000-4000-8000-000000000003',
+  mapleRidge: 'ffffffff-0000-4000-8000-000000000004',
+  kelowna: 'ffffffff-0000-4000-8000-000000000005',
 } as const
 
 const day = (n: number) => new Date(Date.UTC(2030, 0, n))
@@ -30,6 +37,25 @@ export async function resetDatabase() {
     prisma.technician.deleteMany(),
     prisma.skill.deleteMany(),
     prisma.skillCategory.deleteMany(),
+    prisma.city.deleteMany(),
+    prisma.region.deleteMany(),
+    prisma.province.deleteMany(),
+    prisma.province.createMany({ data: [{ code: 'BC', name: 'British Columbia' }] }),
+    prisma.region.createMany({
+      data: [
+        { id: ids.metroVancouver, name: 'Metro Vancouver', provinceCode: 'BC' },
+        { id: ids.centralOkanagan, name: 'Central Okanagan', provinceCode: 'BC' },
+      ],
+    }),
+    prisma.city.createMany({
+      data: [
+        { id: ids.surrey, name: 'Surrey', regionId: ids.metroVancouver },
+        { id: ids.burnaby, name: 'Burnaby', regionId: ids.metroVancouver },
+        { id: ids.langley, name: 'Langley', regionId: ids.metroVancouver },
+        { id: ids.mapleRidge, name: 'Maple Ridge', regionId: ids.metroVancouver },
+        { id: ids.kelowna, name: 'Kelowna', regionId: ids.centralOkanagan },
+      ],
+    }),
     prisma.skillCategory.createMany({
       data: [
         { id: ids.hvac, name: 'HVAC' },
@@ -55,7 +81,7 @@ export async function resetDatabase() {
           email: 'alice@test.example',
           phone: '(555) 010-0001',
           designation: 'Senior Technician',
-          region: 'North',
+          cityId: ids.surrey,
         },
         {
           id: ids.bob,
@@ -63,7 +89,7 @@ export async function resetDatabase() {
           email: 'bob@test.example',
           phone: '(555) 010-0002',
           designation: 'Technician',
-          region: 'South',
+          cityId: ids.langley,
         },
         {
           id: ids.carol,
@@ -71,7 +97,7 @@ export async function resetDatabase() {
           email: 'carol@test.example',
           phone: '(555) 010-0003',
           designation: 'Apprentice Technician',
-          region: 'Central',
+          cityId: ids.kelowna,
         },
       ],
     }),
@@ -85,23 +111,32 @@ export async function resetDatabase() {
     }),
     prisma.job.createMany({
       data: [
-        job(ids.aliceAcJob, 'AC unit not cooling', ids.airConditioning, day(3), ids.alice),
-        job(ids.aliceBreakerJob, 'Breaker keeps tripping', ids.panelUpgrades, day(1), ids.alice),
-        job(ids.bobWaterHeaterJob, 'Replace water heater', ids.waterHeaters, day(2), ids.bob),
-        job(ids.unassignedDishwasherJob, 'Dishwasher not draining', ids.dishwashers, day(5), null),
-        job(ids.unassignedFaucetJob, 'Leaking kitchen faucet', ids.fixturesAndFaucets, day(4), null),
+        job(ids.aliceAcJob, 'AC unit not cooling', ids.airConditioning, day(3), ids.alice, ids.surrey, '12345 72 Ave, Surrey, BC V3W 2M9'),
+        job(ids.aliceBreakerJob, 'Breaker keeps tripping', ids.panelUpgrades, day(1), ids.alice, ids.burnaby, '4500 Kingsway, Burnaby, BC V5H 2A9'),
+        job(ids.bobWaterHeaterJob, 'Replace water heater', ids.waterHeaters, day(2), ids.bob, ids.langley, '20150 56 Ave, Langley, BC V3A 3Y6'),
+        job(ids.unassignedDishwasherJob, 'Dishwasher not draining', ids.dishwashers, day(5), null, ids.kelowna, '1560 Bernard Ave, Kelowna, BC V1Y 6R5'),
+        job(ids.unassignedFaucetJob, 'Leaking kitchen faucet', ids.fixturesAndFaucets, day(4), null, ids.mapleRidge, '22710 Dewdney Trunk Rd, Maple Ridge, BC V2X 3K4'),
       ],
     }),
   ])
 }
 
-function job(id: string, title: string, skillId: string, scheduledDate: Date, technicianId: string | null) {
+function job(
+  id: string,
+  title: string,
+  skillId: string,
+  scheduledDate: Date,
+  technicianId: string | null,
+  cityId: string,
+  address: string,
+) {
   return {
     id,
     title,
     description: `${title} (test fixture)`,
     customerName: 'Test Customer',
-    address: '1 Test Street, Testville',
+    address,
+    cityId,
     skillId,
     priority: 'MEDIUM' as const,
     scheduledDate,

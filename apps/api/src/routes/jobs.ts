@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../db'
 import { HttpError, validate } from '../errors'
 import type { Prisma } from '../generated/prisma/client'
+import { locationSelect, toLocation } from '../locations'
 import { skillSelect } from '../skills'
 
 export const jobsRouter = Router()
@@ -13,6 +14,7 @@ const jobSelect = {
   description: true,
   customerName: true,
   address: true,
+  city: { select: locationSelect },
   skill: { select: skillSelect },
   priority: true,
   scheduledDate: true,
@@ -25,8 +27,8 @@ const jobSelect = {
 type JobRow = Prisma.JobGetPayload<{ select: typeof jobSelect }>
 
 // `requiredSkill` repeats the specialty name for clients that only read names.
-function toJob({ skill, ...job }: JobRow) {
-  return { ...job, requiredSkill: skill.name, skill }
+function toJob({ city, skill, ...job }: JobRow) {
+  return { ...job, location: toLocation(city), requiredSkill: skill.name, skill }
 }
 
 const listQuerySchema = z
