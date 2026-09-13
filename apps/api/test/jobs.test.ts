@@ -12,6 +12,18 @@ const assignedJobCount = async (technicianId: string) => {
   return res.body.find((t: { id: string }) => t.id === technicianId).assignedJobCount
 }
 
+const britishColumbia = { code: 'BC', name: 'British Columbia' }
+const metroVancouver = (city: { id: string; name: string }) => ({
+  city,
+  region: { id: ids.metroVancouver, name: 'Metro Vancouver' },
+  province: britishColumbia,
+})
+const kelowna = {
+  city: { id: ids.kelowna, name: 'Kelowna' },
+  region: { id: ids.centralOkanagan, name: 'Central Okanagan' },
+  province: britishColumbia,
+}
+
 describe('GET /api/jobs', () => {
   it('returns all jobs sorted by scheduled date', async () => {
     const res = await request(app).get('/api/jobs')
@@ -27,6 +39,8 @@ describe('GET /api/jobs', () => {
     expect(res.body[0]).toMatchObject({
       id: ids.aliceBreakerJob,
       title: 'Breaker keeps tripping',
+      address: '4500 Kingsway, Burnaby, BC V5H 2A9',
+      location: metroVancouver({ id: ids.burnaby, name: 'Burnaby' }),
       requiredSkill: 'Panel Upgrades',
       skill: { id: ids.panelUpgrades, name: 'Panel Upgrades', category: { id: ids.electrical, name: 'Electrical' } },
       priority: 'MEDIUM',
@@ -50,6 +64,18 @@ describe('GET /api/jobs', () => {
         'Fixtures & Faucets',
         { id: ids.fixturesAndFaucets, name: 'Fixtures & Faucets', category: { id: ids.plumbing, name: 'Plumbing' } },
       ],
+    })
+  })
+
+  it("includes each job's site location", async () => {
+    const res = await request(app).get('/api/jobs')
+
+    expect(Object.fromEntries(res.body.map((job: { id: string; location: unknown }) => [job.id, job.location]))).toEqual({
+      [ids.aliceAcJob]: metroVancouver({ id: ids.surrey, name: 'Surrey' }),
+      [ids.aliceBreakerJob]: metroVancouver({ id: ids.burnaby, name: 'Burnaby' }),
+      [ids.bobWaterHeaterJob]: metroVancouver({ id: ids.langley, name: 'Langley' }),
+      [ids.unassignedDishwasherJob]: kelowna,
+      [ids.unassignedFaucetJob]: metroVancouver({ id: ids.mapleRidge, name: 'Maple Ridge' }),
     })
   })
 
@@ -99,6 +125,7 @@ describe('PATCH /api/jobs/:id/assignment', () => {
     expect(res.body).toMatchObject({
       id: ids.unassignedDishwasherJob,
       technicianId: ids.carol,
+      location: kelowna,
       requiredSkill: 'Dishwashers',
       skill: { id: ids.dishwashers, name: 'Dishwashers', category: { id: ids.applianceRepair, name: 'Appliance Repair' } },
     })
@@ -191,6 +218,7 @@ describe('PATCH /api/jobs/:id/assignment', () => {
       id: ids.aliceAcJob,
       technicianId: null,
       assignedAt: null,
+      location: metroVancouver({ id: ids.surrey, name: 'Surrey' }),
       requiredSkill: 'Air Conditioning',
       skill: { id: ids.airConditioning, name: 'Air Conditioning', category: { id: ids.hvac, name: 'HVAC' } },
     })

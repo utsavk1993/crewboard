@@ -50,19 +50,59 @@ model TechnicianSkill {
   @@map("technician_skills")
 }
 
+model Province {
+  code String @id
+  name String @unique
+
+  regions Region[]
+
+  @@map("provinces")
+}
+
+/// A service region within a province, e.g. British Columbia › Metro Vancouver.
+model Region {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  provinceCode String   @map("province_code")
+  province     Province @relation(fields: [provinceCode], references: [code])
+
+  cities City[]
+
+  // The unique index also covers lookups by province.
+  @@unique([provinceCode, name])
+  @@map("regions")
+}
+
+model City {
+  id       String @id @default(uuid()) @db.Uuid
+  name     String
+  regionId String @map("region_id") @db.Uuid
+  region   Region @relation(fields: [regionId], references: [id])
+
+  technicians Technician[]
+  jobs        Job[]
+
+  // The unique index also covers lookups by region.
+  @@unique([regionId, name])
+  @@map("cities")
+}
+
 model Technician {
   id          String   @id @default(uuid()) @db.Uuid
   name        String
   email       String   @unique
   phone       String
   designation String
-  region      String
+  /// Home base.
+  cityId      String   @map("city_id") @db.Uuid
+  city        City     @relation(fields: [cityId], references: [id])
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   skills TechnicianSkill[]
   jobs   Job[]
 
+  @@index([cityId])
   @@map("technicians")
 }
 
@@ -72,6 +112,9 @@ model Job {
   description   String
   customerName  String      @map("customer_name")
   address       String
+  /// Job site.
+  cityId        String      @map("city_id") @db.Uuid
+  city          City        @relation(fields: [cityId], references: [id])
   skillId       String      @map("skill_id") @db.Uuid
   skill         Skill       @relation(fields: [skillId], references: [id])
   priority      Priority
@@ -84,5 +127,6 @@ model Job {
 
   @@index([technicianId])
   @@index([skillId])
+  @@index([cityId])
   @@map("jobs")
 }
