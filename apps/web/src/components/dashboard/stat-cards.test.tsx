@@ -15,6 +15,7 @@ function technician(id: string, assignedJobCount: number): Technician {
     specialties: [makeSpecialty('HVAC', 'Trades')],
     location: makeLocation('North'),
     assignedJobCount,
+    hiredOn: '2019-03-14T00:00:00.000Z',
   }
 }
 

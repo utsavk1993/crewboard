@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes, useParams } from 'react-router'
 import { TechnicianSheet, type TechnicianSheetProps } from '@/components/dashboard/technician-sheet'
 import { formatDate } from '@/lib/format'
 import type { Job, Technician } from '@/lib/types'
@@ -20,6 +21,7 @@ const technician: Technician = {
   ],
   location: makeLocation('Surrey'),
   assignedJobCount: 2,
+  hiredOn: '2019-03-14T00:00:00.000Z',
 }
 
 const jobs: Job[] = [
@@ -53,23 +55,37 @@ const jobs: Job[] = [
   },
 ]
 
+function ProfileRoute() {
+  return <h1>Profile {useParams().technicianId}</h1>
+}
+
 function renderSheet(props: Partial<TechnicianSheetProps> = {}) {
   const onClose = jest.fn()
   const onAssign = jest.fn()
   const onUnassign = jest.fn()
   render(
-    <TechnicianSheet
-      open
-      technician={technician}
-      jobs={jobs}
-      loading={false}
-      error={null}
-      pendingJobId={null}
-      onClose={onClose}
-      onAssign={onAssign}
-      onUnassign={onUnassign}
-      {...props}
-    />,
+    <MemoryRouter>
+      <Routes>
+        <Route
+          index
+          element={
+            <TechnicianSheet
+              open
+              technician={technician}
+              jobs={jobs}
+              loading={false}
+              error={null}
+              pendingJobId={null}
+              onClose={onClose}
+              onAssign={onAssign}
+              onUnassign={onUnassign}
+              {...props}
+            />
+          }
+        />
+        <Route path="technicians/:technicianId" element={<ProfileRoute />} />
+      </Routes>
+    </MemoryRouter>,
   )
   return { onClose, onAssign, onUnassign }
 }
@@ -175,6 +191,19 @@ describe('TechnicianSheet', () => {
     await user.click(screen.getByRole('button', { name: 'Assign job' }))
     expect(onAssign).toHaveBeenCalledTimes(1)
     expect(onAssign).toHaveBeenCalledWith(technician)
+  })
+
+  it('links to the technician’s full profile and closes the sheet', async () => {
+    const user = userEvent.setup()
+    const { onClose } = renderSheet()
+
+    const link = screen.getByRole('link', { name: 'View full profile' })
+    expect(link).toHaveAttribute('href', '/technicians/t1')
+
+    await user.click(link)
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('heading', { name: 'Profile t1' })).toBeInTheDocument()
   })
 
   it('calls onClose when closed from the Close button', async () => {

@@ -36,6 +36,8 @@ export interface Technician {
   specialties: Specialty[]
   location: Location
   assignedJobCount: number
+  // A calendar date, sent as midnight UTC.
+  hiredOn: string
 }
 
 export interface Job {

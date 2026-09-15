@@ -13,6 +13,7 @@ import {
   type FilterFn,
 } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Search, SearchX, Users, type LucideIcon } from 'lucide-react'
+import { Link } from 'react-router'
 import { TechnicianAvatar } from '@/components/dashboard/technician-avatar'
 import { WorkloadMeter } from '@/components/dashboard/workload-meter'
 import { Badge } from '@/components/ui/badge'
@@ -97,7 +98,13 @@ function TechnicianCell({ technician }: { technician: Technician }) {
     <div className="flex items-center gap-3">
       <TechnicianAvatar name={technician.name} />
       <div className="min-w-0 max-w-56">
-        <p className="truncate font-medium">{technician.name}</p>
+        {/* The link truncates itself rather than inside a clipping parent, so its focus ring stays visible. */}
+        <Link
+          to={`/technicians/${technician.id}`}
+          className="block w-fit max-w-full truncate rounded-sm font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
+          {technician.name}
+        </Link>
         <p className="truncate text-xs text-muted-foreground">{technician.email}</p>
       </div>
     </div>

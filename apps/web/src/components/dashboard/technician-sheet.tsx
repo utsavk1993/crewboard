@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import {
+  ArrowUpRightIcon,
   CalendarDaysIcon,
   ChevronRightIcon,
   CircleAlertIcon,
@@ -9,6 +10,7 @@ import {
   PlusIcon,
   type LucideIcon,
 } from 'lucide-react'
+import { Link } from 'react-router'
 import { LocationLabel } from '@/components/dashboard/location-label'
 import { PriorityBadge } from '@/components/dashboard/priority-badge'
 import { SkillGroups } from '@/components/dashboard/skill-groups'
@@ -173,10 +175,16 @@ export function TechnicianSheet({
             {/* Right padding leaves room for the sheet's close button. */}
             <SheetHeader className="flex-row items-center gap-3 border-b py-4 pr-12 pl-5">
               <TechnicianAvatar name={technician.name} size="lg" />
-              <div className="flex min-w-0 flex-col gap-0.5">
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <SheetTitle className="truncate text-base leading-6">{technician.name}</SheetTitle>
                 <SheetDescription className="truncate">{technician.designation}</SheetDescription>
               </div>
+              <Button variant="outline" size="sm" asChild className="shrink-0">
+                <Link to={`/technicians/${technician.id}`} onClick={onClose}>
+                  View full profile
+                  <ArrowUpRightIcon aria-hidden="true" />
+                </Link>
+              </Button>
             </SheetHeader>
 
             <div className="min-h-0 flex-1 overflow-y-auto">

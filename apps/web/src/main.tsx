@@ -6,11 +6,12 @@ import { App } from '@/App'
 import { ThemeProvider } from '@/components/theme/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { shouldRetryQuery } from '@/lib/queries'
 import '@/index.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 10_000, retry: 1 },
+    queries: { staleTime: 10_000, retry: shouldRetryQuery },
   },
 })
 

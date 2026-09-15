@@ -13,6 +13,7 @@ const technician: Technician = {
   specialties: [makeSpecialty('Electrical', 'Trades')],
   location: makeLocation('North'),
   assignedJobCount: 2,
+  hiredOn: '2019-03-14T00:00:00.000Z',
 }
 
 function jsonResponse(status: number, body: unknown) {
@@ -61,14 +62,16 @@ describe('api', () => {
     expect(init.headers).toEqual({ Accept: 'application/json' })
   })
 
-  it('requests unassigned jobs and a technician’s jobs with URL-encoded ids', async () => {
+  it('requests unassigned jobs, a technician and their jobs with URL-encoded ids', async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, []))
 
     await api.getUnassignedJobs()
     await api.getTechnicianJobs('a b/c')
+    await api.getTechnician('a b/c')
 
     expect(fetchMock.mock.calls[0][0]).toBe('/api/jobs?unassigned=true')
     expect(fetchMock.mock.calls[1][0]).toBe('/api/jobs?technicianId=a%20b%2Fc')
+    expect(fetchMock.mock.calls[2][0]).toBe('/api/technicians/a%20b%2Fc')
   })
 
   it('throws an ApiError with the message, code and status from the error body', async () => {

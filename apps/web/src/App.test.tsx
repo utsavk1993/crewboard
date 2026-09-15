@@ -48,6 +48,7 @@ const ada: Technician = {
   specialties: [makeSpecialty('Electrical', 'Trades')],
   location: makeLocation('North'),
   assignedJobCount: 1,
+  hiredOn: '2019-03-14T00:00:00.000Z',
 }
 const alan: Technician = { ...ada, id: 'alan', name: 'Alan Turing', email: 'alan@crewboard.test', assignedJobCount: 0 }
 
