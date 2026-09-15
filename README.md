@@ -64,10 +64,18 @@ Run from the repository root.
 - **cities**: a city within a region, e.g. British Columbia › Metro Vancouver › Surrey; name (unique per region), `region_id`
 - **skill_categories**: name (unique), e.g. Appliance Repair
 - **skills**: a specialty within a category, e.g. Appliance Repair › Refrigerators; name (globally unique), `category_id`
-- **technicians**: name, email (unique), phone, designation, home base (`city_id`); specialties through **technician_skills** (`technician_id`, `skill_id`)
+- **technicians**: name, email (unique), phone, designation, home base (`city_id`), `active_job_count`; specialties through **technician_skills** (`technician_id`, `skill_id`)
 - **jobs**: title, description, customer, address, job site (`city_id`), required specialty (`skill_id`), priority (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), scheduled date, status (`OPEN`, `ASSIGNED`, `COMPLETED`, `CANCELLED`), nullable `technician_id`, `assigned_at`, `completed_at`
 
 A technician has many jobs and a job has at most one technician, so the foreign key lives on `jobs`. A job's lifecycle is its status: `OPEN` jobs wait for a technician, `ASSIGNED` jobs are held by one, and `COMPLETED` or `CANCELLED` jobs are closed history (a completed job keeps its technician and `completed_at`). A technician's load is the number of `ASSIGNED` jobs they hold, so history never inflates it. The status sets live in `apps/api/src/job-status.ts`.
+
+The load is stored as `technicians.active_job_count` rather than counted per request: every assign and unassign moves it in the same transaction as the job update, and only when the job actually changed state, so conflicts and no-ops never touch it. Bulk writes (the seed, test fixtures) call `recomputeActiveJobCounts` from `apps/api/src/workload-counter.ts` afterwards.
+
+Indexes are sized for tens of thousands of technicians and a million jobs, and all declared in `schema.prisma`:
+
+- **jobs**: `(status, technician_id)`, `(status, scheduled_date, priority)`, `(skill_id, status)`, `(city_id, status)`, `(technician_id)`
+- **technicians**: `(name, id)` and `(active_job_count, name, id)` for keyset pagination, `(city_id)`
+- Trigram GIN indexes (the `pg_trgm` extension, enabled by the migration) on technician name and email and on job title and customer name, for `ILIKE '%term%'` search
 
 The seed creates a service geography for a company headquartered in British Columbia with branches in Alberta: 2 provinces, 6 regions and 22 cities (British Columbia › Metro Vancouver, Fraser Valley, Capital Region, Central Okanagan; Alberta › Calgary Region, Edmonton Region). It adds 7 skill categories with 30 specialties, 28 technicians (16 based in Metro Vancouver) with a deliberately uneven workload and 2–5 specialties from one or two categories each, and 88 active jobs (52 assigned, 36 open, spread across every region). Job addresses use real street names and postal code prefixes for their city. Assigned jobs always require a specialty the technician has and are usually in the technician's region. On top of that it adds history: 113 completed jobs (2–6 per technician over the last 120 days, never before their hire date) and 8 cancelled jobs.
 

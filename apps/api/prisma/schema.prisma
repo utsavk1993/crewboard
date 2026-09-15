@@ -96,22 +96,30 @@ model City {
 }
 
 model Technician {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String
-  email       String   @unique
-  phone       String
-  designation String
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String
+  email          String   @unique
+  phone          String
+  designation    String
   /// Home base.
-  cityId      String   @map("city_id") @db.Uuid
-  city        City     @relation(fields: [cityId], references: [id])
-  hiredOn     DateTime @map("hired_on") @db.Date
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  cityId         String   @map("city_id") @db.Uuid
+  city           City     @relation(fields: [cityId], references: [id])
+  hiredOn        DateTime @map("hired_on") @db.Date
+  /// Number of ASSIGNED jobs held, kept in the same transaction as every assign and unassign.
+  activeJobCount Int      @default(0) @map("active_job_count")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   skills TechnicianSkill[]
   jobs   Job[]
 
+  // Keyset pagination by name, or by workload then name.
+  @@index([name, id])
+  @@index([activeJobCount, name, id])
   @@index([cityId])
+  // Substring search (ILIKE '%term%'), via pg_trgm.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "technicians_name_trgm_idx")
+  @@index([email(ops: raw("gin_trgm_ops"))], type: Gin, map: "technicians_email_trgm_idx")
   @@map("technicians")
 }
 
@@ -137,7 +145,13 @@ model Job {
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
   @@index([technicianId])
-  @@index([skillId])
-  @@index([cityId])
+  @@index([status, technicianId])
+  @@index([status, scheduledDate, priority])
+  // These also cover lookups by skill or city alone.
+  @@index([skillId, status])
+  @@index([cityId, status])
+  // Substring search (ILIKE '%term%'), via pg_trgm.
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "jobs_title_trgm_idx")
+  @@index([customerName(ops: raw("gin_trgm_ops"))], type: Gin, map: "jobs_customer_name_trgm_idx")
   @@map("jobs")
 }

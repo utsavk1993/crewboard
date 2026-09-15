@@ -1,6 +1,7 @@
 import { fakerEN_CA as faker } from '@faker-js/faker'
 import { prisma } from '../src/db'
 import type { Priority } from '../src/generated/prisma/client'
+import { recomputeActiveJobCounts } from '../src/workload-counter'
 
 faker.seed(20260910)
 
@@ -485,6 +486,7 @@ async function main() {
     prisma.technician.createMany({ data: technicians }),
     prisma.technicianSkill.createMany({ data: technicianSkills }),
     prisma.job.createMany({ data: [...assignedJobs, ...unassignedJobs, ...completedJobs, ...cancelledJobs] }),
+    recomputeActiveJobCounts(prisma),
   ])
 
   const activeCount = assignedJobs.length + unassignedJobs.length
