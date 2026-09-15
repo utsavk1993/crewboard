@@ -12,12 +12,25 @@ import {
   type Column,
   type FilterFn,
 } from '@tanstack/react-table'
-import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Search, SearchX, Users, type LucideIcon } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  BriefcaseBusiness,
+  EllipsisVertical,
+  Plus,
+  Search,
+  SearchX,
+  UserRound,
+  Users,
+  type LucideIcon,
+} from 'lucide-react'
 import { Link } from 'react-router'
 import { TechnicianAvatar } from '@/components/dashboard/technician-avatar'
 import { WorkloadMeter } from '@/components/dashboard/workload-meter'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -97,7 +110,9 @@ function TechnicianCell({ technician }: { technician: Technician }) {
   return (
     <div className="flex items-center gap-3">
       <TechnicianAvatar name={technician.name} />
-      <div className="min-w-0 max-w-56">
+      {/* The cap is what lets the column shrink: a truncating block never asks for more than its
+          max-width, so long names and emails give way to the other columns instead of clipping them. */}
+      <div className="min-w-0 max-w-24 sm:max-w-44">
         {/* The link truncates itself rather than inside a clipping parent, so its focus ring stays visible. */}
         <Link
           to={`/technicians/${technician.id}`}
@@ -193,6 +208,61 @@ function LocationCell({ location }: { location: Location }) {
   )
 }
 
+// The labelled buttons only fit beside every other column at `xl`. Narrower viewports get the same
+// actions in a menu that stays inside the row, so they never scroll out of reach.
+function RowActions({
+  technician,
+  onAssign,
+  onViewJobs,
+}: {
+  technician: Technician
+  onAssign: TechniciansTableProps['onAssign']
+  onViewJobs: TechniciansTableProps['onViewJobs']
+}) {
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`More actions for ${technician.name}`}
+            className="xl:hidden"
+          >
+            <EllipsisVertical aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-40">
+          <DropdownMenuItem onSelect={() => onAssign(technician)}>
+            <Plus aria-hidden="true" />
+            Assign job<span className="sr-only"> to {technician.name}</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onViewJobs(technician)}>
+            <BriefcaseBusiness aria-hidden="true" />
+            View jobs<span className="sr-only"> for {technician.name}</span>
+          </DropdownMenuItem>
+          {/* The name in the first column links to the profile too, but it is easy to miss once it truncates. */}
+          <DropdownMenuItem asChild>
+            <Link to={`/technicians/${technician.id}`}>
+              <UserRound aria-hidden="true" />
+              View profile<span className="sr-only"> of {technician.name}</span>
+            </Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <div className="hidden items-center gap-1 xl:flex">
+        <Button size="sm" onClick={() => onAssign(technician)}>
+          <Plus aria-hidden="true" />
+          Assign job<span className="sr-only"> to {technician.name}</span>
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => onViewJobs(technician)}>
+          View jobs<span className="sr-only"> for {technician.name}</span>
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 const columnHelper = createColumnHelper<Features, Technician>()
 
 function buildColumns(
@@ -204,49 +274,46 @@ function buildColumns(
       header: ({ column }) => <SortableHeader column={column}>Technician</SortableHeader>,
       cell: ({ row }) => <TechnicianCell technician={row.original} />,
       sortFn: (rowA, rowB) => compareNames(rowA.original, rowB.original),
-      meta: { className: 'min-w-56' },
+      meta: { className: 'sm:min-w-56' },
     }),
+    // Each secondary column appears one breakpoint later than the one before it, so the columns that
+    // are still on screen always have room for their content.
     columnHelper.accessor('designation', {
       header: 'Role',
       enableSorting: false,
       cell: ({ getValue }) => <span className="whitespace-nowrap">{getValue()}</span>,
-      meta: { className: 'hidden md:table-cell' },
+      meta: { className: 'hidden lg:table-cell' },
     }),
     columnHelper.accessor('specialties', {
       header: 'Skills',
       enableSorting: false,
       cell: ({ getValue }) => <SkillCategories specialties={getValue()} />,
-      meta: { className: 'hidden sm:table-cell' },
+      meta: { className: 'hidden md:table-cell' },
     }),
     columnHelper.accessor('location', {
       header: 'Location',
       enableSorting: false,
       cell: ({ getValue }) => <LocationCell location={getValue()} />,
-      meta: { className: 'hidden lg:table-cell' },
+      meta: { className: 'hidden xl:table-cell' },
     }),
     columnHelper.accessor('assignedJobCount', {
       header: ({ column }) => <SortableHeader column={column}>Workload</SortableHeader>,
-      cell: ({ row }) => <WorkloadMeter count={row.original.assignedJobCount} name={row.original.name} />,
+      // The level reads from the meter's colour and is in its value text, so the column keeps only the
+      // count and the bar and leaves the width to the columns that need it.
+      cell: ({ row }) => (
+        <WorkloadMeter count={row.original.assignedJobCount} name={row.original.name} showLabel={false} />
+      ),
       // Dispatchers look for the busiest technicians first.
       sortDescFirst: true,
       sortFn: (rowA, rowB) => rowA.original.assignedJobCount - rowB.original.assignedJobCount,
-      meta: { className: 'w-40' },
+      meta: { className: 'w-28' },
     }),
     columnHelper.display({
       id: 'actions',
       header: () => <span className="sr-only">Actions</span>,
-      cell: ({ row }) => (
-        <div className="flex items-center justify-end gap-1">
-          <Button size="sm" onClick={() => onAssign(row.original)}>
-            <Plus aria-hidden="true" />
-            Assign job<span className="sr-only"> to {row.original.name}</span>
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => onViewJobs(row.original)}>
-            View jobs<span className="sr-only"> for {row.original.name}</span>
-          </Button>
-        </div>
-      ),
-      meta: { className: 'text-right' },
+      cell: ({ row }) => <RowActions technician={row.original} onAssign={onAssign} onViewJobs={onViewJobs} />,
+      // The actions sit hard right, so the column gives its left padding up to the rest of the row.
+      meta: { className: 'pl-0 text-right' },
     }),
   ])
 }
@@ -257,8 +324,8 @@ const skeletonCells: Record<string, ReactNode> = {
     <div className="flex items-center gap-3">
       <Skeleton className="size-8 rounded-full" />
       <div className="flex flex-col gap-1.5">
-        <Skeleton className="h-3.5 w-28" />
-        <Skeleton className="h-3 w-40" />
+        <Skeleton className="h-3.5 w-16 sm:w-28" />
+        <Skeleton className="h-3 w-24 sm:w-40" />
       </div>
     </div>
   ),
@@ -275,11 +342,12 @@ const skeletonCells: Record<string, ReactNode> = {
       <Skeleton className="h-3 w-28" />
     </div>
   ),
-  assignedJobCount: <Skeleton className="h-3.5 w-28" />,
+  assignedJobCount: <Skeleton className="h-3.5 w-20 sm:w-24" />,
   actions: (
     <div className="flex justify-end gap-1">
-      <Skeleton className="h-8 w-24" />
-      <Skeleton className="h-8 w-20" />
+      <Skeleton className="size-8 xl:hidden" />
+      <Skeleton className="hidden h-8 w-24 xl:block" />
+      <Skeleton className="hidden h-8 w-20 xl:block" />
     </div>
   ),
 }

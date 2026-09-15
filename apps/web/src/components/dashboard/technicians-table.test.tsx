@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useParams } from 'react-router'
 import { TechniciansTable, type TechniciansTableProps } from '@/components/dashboard/technicians-table'
@@ -127,6 +127,17 @@ describe('TechniciansTable', () => {
     expect(row.getByText('Kelowna')).toBeInTheDocument()
     expect(row.getByText('Central Okanagan')).toBeInTheDocument()
     expect(row.getByRole('meter', { name: 'Alan Turing workload' })).toHaveAttribute('aria-valuenow', '0')
+  })
+
+  it('keeps the workload level in the meter instead of spending column width on its label', () => {
+    renderTable()
+
+    const row = within(rowFor('Ada Lovelace'))
+    expect(row.getByRole('meter', { name: 'Ada Lovelace workload' })).toHaveAttribute(
+      'aria-valuetext',
+      '5 jobs, Heavy',
+    )
+    expect(row.queryByText('Heavy')).not.toBeInTheDocument()
   })
 
   it('shows a badge for two skill categories and summarizes the rest', () => {
@@ -265,6 +276,62 @@ describe('TechniciansTable', () => {
     expect(onViewJobs).toHaveBeenCalledTimes(1)
     expect(onViewJobs).toHaveBeenCalledWith(technicians[2])
     expect(onAssign).toHaveBeenCalledTimes(1)
+  })
+
+  it('swaps the labelled buttons for a menu below the widest breakpoint', () => {
+    renderTable()
+
+    const row = within(rowFor('Grace Hopper'))
+    expect(row.getByRole('button', { name: 'More actions for Grace Hopper' })).toHaveClass('xl:hidden')
+    expect(row.getByRole('button', { name: 'Assign job to Grace Hopper' }).parentElement).toHaveClass(
+      'hidden',
+      'xl:flex',
+    )
+  })
+
+  it('offers the same actions in the compact row menu', async () => {
+    const { user, onAssign, onViewJobs } = renderTable()
+
+    await user.click(within(rowFor('Grace Hopper')).getByRole('button', { name: 'More actions for Grace Hopper' }))
+
+    const menu = within(screen.getByRole('menu'))
+    expect(menu.getByRole('menuitem', { name: 'View profile of Grace Hopper' })).toHaveAttribute(
+      'href',
+      '/technicians/grace',
+    )
+
+    await user.click(menu.getByRole('menuitem', { name: 'Assign job to Grace Hopper' }))
+
+    expect(onAssign).toHaveBeenCalledTimes(1)
+    expect(onAssign).toHaveBeenCalledWith(technicians[0])
+    expect(onViewJobs).not.toHaveBeenCalled()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('opens the row menu and picks an action with the keyboard', async () => {
+    const { user, onViewJobs } = renderTable()
+
+    const trigger = within(rowFor('Alan Turing')).getByRole('button', { name: 'More actions for Alan Turing' })
+    act(() => trigger.focus())
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: 'Assign job to Alan Turing' })).toHaveFocus())
+
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('menuitem', { name: 'View jobs for Alan Turing' })).toHaveFocus()
+    await user.keyboard('{Enter}')
+
+    expect(onViewJobs).toHaveBeenCalledWith(technicians[2])
+    await waitFor(() => expect(trigger).toHaveFocus())
+  })
+
+  it('reaches a profile from the row menu', async () => {
+    const { user } = renderTable()
+
+    await user.click(within(rowFor('Ada Lovelace')).getByRole('button', { name: 'More actions for Ada Lovelace' }))
+    await user.click(screen.getByRole('menuitem', { name: 'View profile of Ada Lovelace' }))
+
+    expect(screen.getByRole('heading', { name: 'Profile ada' })).toBeInTheDocument()
   })
 
   it('links each technician’s name to their profile', async () => {

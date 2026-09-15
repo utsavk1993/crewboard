@@ -35,7 +35,8 @@ export function WorkloadMeter({ count, name, showLabel = true, className }: Work
       <span aria-hidden="true" className="min-w-[2ch] text-right text-sm font-medium tabular-nums">
         {count}
       </span>
-      <div aria-hidden="true" className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-muted">
+      {/* Shorter on phones, where the bar shares a narrow table row with the count and the row actions. */}
+      <div aria-hidden="true" className="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-muted sm:w-16">
         <div
           data-slot="workload-meter-fill"
           className={cn(

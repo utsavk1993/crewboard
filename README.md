@@ -129,6 +129,7 @@ Assigning moves an `OPEN` job to `ASSIGNED` with a conditional update on `status
 - **Assign job** opens a dialog of unassigned jobs, with jobs matching the technician's skills ranked first, then by priority and date.
 - **View jobs** opens a side sheet with the technician's details and assigned jobs, each with **Unassign**.
 - After every change the table, stats, sheet and dialog refetch; a job someone else just took shows the conflict inside the dialog.
+- The table sheds one secondary column per breakpoint as the viewport narrows (Location, then Role, then Skills), and below `xl` the row actions collapse into a per-row menu (Assign job, View jobs, View profile), so nothing is clipped or scrolled out of reach on a laptop or a phone.
 
 Workload levels: 0 jobs Available, 1–2 Light, 3–4 Steady, 5+ Heavy.
 
