@@ -50,6 +50,7 @@ Run from the repository root.
 | `npm run db:up` / `db:down` | Start / stop the Postgres container |
 | `npm run db:migrate` | Apply migrations to `DATABASE_URL` |
 | `npm run db:seed` | Wipe and re-seed technicians and jobs (deterministic) |
+| `npm run db:seed:large` | Wipe and re-seed at scale: 50,000 technicians and 1,000,000 jobs ([details](#large-dataset)) |
 | `npm run db:reset` | Drop everything, re-apply migrations, re-seed |
 | `npm run typecheck` | Type-check both apps |
 | `npm test` | API integration tests and web component tests |
@@ -79,7 +80,30 @@ Indexes are sized for tens of thousands of technicians and a million jobs, and a
 
 The seed creates a service geography for a company headquartered in British Columbia with branches in Alberta: 2 provinces, 6 regions and 22 cities (British Columbia › Metro Vancouver, Fraser Valley, Capital Region, Central Okanagan; Alberta › Calgary Region, Edmonton Region). It adds 7 skill categories with 30 specialties, 28 technicians (16 based in Metro Vancouver) with a deliberately uneven workload and 2–5 specialties from one or two categories each, and 88 active jobs (52 assigned, 36 open, spread across every region). Job addresses use real street names and postal code prefixes for their city. Assigned jobs always require a specialty the technician has and are usually in the technician's region. On top of that it adds history: 113 completed jobs (2–6 per technician over the last 120 days, never before their hire date) and 8 cancelled jobs.
 
+The shared reference data and the builders both seeds use live in `apps/api/prisma/seed-data.ts`.
+
 Technicians include `specialties: { id, name, category: { id, name } }[]` (sorted by category, then specialty) and jobs include `skill: { id, name, category: { id, name } }`. Both include `location: { city: { id, name }, region: { id, name }, province: { code, name } }`: a technician's home base or a job's site. The older `skills` (specialty names), `requiredSkill` (specialty name) and technician `region` (home base city name) fields are still returned.
+
+### Large dataset
+
+`npm run db:seed:large` replaces the dataset with a Canada-wide one to develop and demo against at scale: by default 50,000 technicians and 1,000,000 jobs, over the same geography and skill taxonomy as the dev seed.
+
+```bash
+npm run db:seed:large                                       # 50,000 technicians, 1,000,000 jobs
+npm run db:seed:large -- --technicians 2000 --jobs 50000    # any size you like
+```
+
+Reach for it to check indexes, query plans and the UI against realistic volumes; `npm run db:seed` stays the seed for everyday work, and the counts above describe that small dataset. Both seeds wipe what came before, so switching between them is one command.
+
+Everything except the reference data is generated inside Postgres from `generate_series`, so the default run takes well under a minute on a laptop instead of the many minutes a row-by-row script would need. It prints the row counts and how long each step took, and runs `ANALYZE` at the end so the planner has fresh statistics. A rerun with the same flags produces the same data; only the row ids change.
+
+The mix is deliberately uneven:
+
+- **Technicians** spread over every region, weighted to Metro Vancouver (48% of the crew, 82% in British Columbia), with 2–5 specialties concentrated in one or two categories and hire dates over the last 15 years.
+- **Jobs** are 92% `COMPLETED` over the last three years, 4% `ASSIGNED`, 3% `OPEN` backlog and 1% `CANCELLED`. Assigned and completed jobs always require one of their technician's specialties, 85% of them are in the technician's own region and the rest elsewhere in the same province, and none of them predate the technician's hire date.
+- **Workloads** run 0–8 assigned jobs, held by about a quarter of the crew, and `active_job_count` matches them exactly: the script finishes by running `recomputeActiveJobCounts` and fails if it finds a single counter to correct.
+
+The list endpoints still return whole tables, so the web app can't take the full default dataset yet: `GET /api/technicians` fails for 50,000 technicians (`P2029`, more bind parameters than Postgres accepts) and `GET /api/jobs` answers with about 60 MB. Seed a few thousand technicians when you want to drive the UI.
 
 ### API
 
@@ -126,7 +150,7 @@ Workload levels: 0 jobs Available, 1–2 Light, 3–4 Steady, 5+ Heavy.
 ```
 apps/
   api/
-    prisma/            schema, migrations, seed
+    prisma/            schema, migrations, seeds
     src/routes/        health, technicians, jobs
     test/              integration tests and fixtures
   web/
