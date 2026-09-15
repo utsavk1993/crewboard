@@ -1,5 +1,6 @@
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes, useParams } from 'react-router'
 import { TechniciansTable, type TechniciansTableProps } from '@/components/dashboard/technicians-table'
 import type { Technician } from '@/lib/types'
 import { makeLocation, makeSpecialty } from '@/test/factories'
@@ -67,17 +68,31 @@ const technicians = [
   }),
 ]
 
+function ProfileRoute() {
+  return <h1>Profile {useParams().technicianId}</h1>
+}
+
 function renderTable(props: Partial<TechniciansTableProps> = {}) {
   const onAssign = jest.fn()
   const onViewJobs = jest.fn()
   const view = render(
-    <TechniciansTable
-      technicians={technicians}
-      loading={false}
-      onAssign={onAssign}
-      onViewJobs={onViewJobs}
-      {...props}
-    />,
+    <MemoryRouter>
+      <Routes>
+        <Route
+          index
+          element={
+            <TechniciansTable
+              technicians={technicians}
+              loading={false}
+              onAssign={onAssign}
+              onViewJobs={onViewJobs}
+              {...props}
+            />
+          }
+        />
+        <Route path="technicians/:technicianId" element={<ProfileRoute />} />
+      </Routes>
+    </MemoryRouter>,
   )
   return { ...view, onAssign, onViewJobs, user: userEvent.setup() }
 }
@@ -250,6 +265,20 @@ describe('TechniciansTable', () => {
     expect(onViewJobs).toHaveBeenCalledTimes(1)
     expect(onViewJobs).toHaveBeenCalledWith(technicians[2])
     expect(onAssign).toHaveBeenCalledTimes(1)
+  })
+
+  it('links each technician’s name to their profile', async () => {
+    const { user } = renderTable()
+
+    const row = within(rowFor('Alan Turing'))
+    const link = row.getByRole('link', { name: 'Alan Turing' })
+    expect(link).toHaveAttribute('href', '/technicians/alan')
+    expect(row.queryByRole('link', { name: 'alan@crewboard.test' })).not.toBeInTheDocument()
+
+    await user.click(link)
+
+    expect(screen.getByRole('heading', { name: 'Profile alan' })).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Technicians' })).not.toBeInTheDocument()
   })
 
   it('shows skeleton rows while loading', () => {

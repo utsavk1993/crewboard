@@ -126,7 +126,7 @@ export function TechnicianProfilePage() {
             <aside aria-label="Technician summary" className="flex min-w-0 flex-col gap-6">
               <DetailsCard technician={technician.data} />
               <SkillsCard technician={technician.data} />
-              <WorkloadCard technician={technician.data} jobs={jobs.data} loading={jobs.isPending && !jobs.isError} />
+              <WorkloadCard technician={technician.data} jobs={jobs.data} loading={jobs.isPending} />
             </aside>
           </div>
         </>

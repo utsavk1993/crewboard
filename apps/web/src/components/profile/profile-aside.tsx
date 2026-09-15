@@ -33,8 +33,13 @@ export function DetailsCard({ technician }: { technician: Technician }) {
       <CardContent>
         <dl className="flex flex-col gap-3 text-sm">
           <Detail term="Home base">
-            {/* The row's label already says what this is, so the pin would only add noise. */}
-            <LocationLabel location={technician.location} detail="full" className="[&>svg:first-child]:hidden" />
+            {/* The row's label already says what this is, so the pin would only add noise. Wrapping instead of
+                truncating keeps every place readable in a narrow column. */}
+            <LocationLabel
+              location={technician.location}
+              detail="full"
+              className="flex-wrap [&>svg:first-child]:hidden"
+            />
           </Detail>
           <Detail term="Joined">
             <time dateTime={technician.hiredOn.slice(0, 10)}>{formatMonthYear(technician.hiredOn)}</time>
