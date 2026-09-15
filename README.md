@@ -92,8 +92,12 @@ Technicians include `specialties: { id, name, category: { id, name } }[]` (sorte
 | GET | `/api/jobs?unassigned=true` | `OPEN` jobs |
 | GET | `/api/jobs?technicianId=<uuid>` | `ASSIGNED` jobs held by one technician |
 | PATCH | `/api/jobs/:id/assignment` | `{ "technicianId": "<uuid>" }` assigns, `{ "technicianId": null }` unassigns |
+| GET | `/api/stats` | The dashboard's numbers, as aggregates |
+| GET | `/api/skills` | The skill taxonomy: categories with their specialties, sorted by name |
 
 Jobs include `status` and `completedAt`.
+
+`/api/stats` returns `{ technicians: { total, available, heavy }, jobs: { assigned, unassigned, urgentUnassigned, averagePerTechnician } }`, using the same workload levels as the board: available is 0 assigned jobs and heavy is 5 or more. It is one round trip of six counts, each restricted to an index range — the technician counts read the stored `active_job_count` instead of recounting jobs per technician — so the dashboard never fetches a list to add it up. `/api/skills` returns `{ categories: [{ id, name, specialties: [{ id, name }] }] }`, including categories that have no specialties yet.
 
 Errors always use `{ "error": { "code", "message" } }`: `400 VALIDATION_ERROR` / `BAD_REQUEST`, `404 JOB_NOT_FOUND` / `TECHNICIAN_NOT_FOUND`, `409 JOB_ALREADY_ASSIGNED` / `JOB_CLOSED`.
 
@@ -127,7 +131,7 @@ Workload levels: 0 jobs Available, 1–2 Light, 3–4 Steady, 5+ Heavy.
 apps/
   api/
     prisma/            schema, migrations, seed
-    src/routes/        health, technicians, jobs
+    src/routes/        health, technicians, jobs, stats, skills
     test/              integration tests and fixtures
   web/
     src/components/    ui, dashboard, layout, theme
