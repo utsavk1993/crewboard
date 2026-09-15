@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../db'
 import { HttpError, validate } from '../errors'
 import type { Prisma } from '../generated/prisma/client'
+import { assignedJobWhere } from '../job-status'
 import { locationSelect, toLocation } from '../locations'
 import { skillSelect } from '../skills'
 
@@ -20,7 +21,8 @@ const technicianSelect = {
     select: { skill: { select: skillSelect } },
     orderBy: [{ skill: { category: { name: 'asc' } } }, { skill: { name: 'asc' } }],
   },
-  _count: { select: { jobs: true } },
+  // Completed and cancelled jobs stay linked as history but don't count toward workload.
+  _count: { select: { jobs: { where: assignedJobWhere } } },
 } satisfies Prisma.TechnicianSelect
 
 type TechnicianRow = Prisma.TechnicianGetPayload<{ select: typeof technicianSelect }>
