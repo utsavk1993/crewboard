@@ -3,6 +3,8 @@ import { errorHandler, notFoundHandler } from './errors'
 import { assistantRouter } from './routes/assistant'
 import { healthRouter } from './routes/health'
 import { jobsRouter } from './routes/jobs'
+import { skillsRouter } from './routes/skills'
+import { statsRouter } from './routes/stats'
 import { techniciansRouter } from './routes/technicians'
 
 export function createApp() {
@@ -15,6 +17,8 @@ export function createApp() {
   app.use('/api/health', healthRouter)
   app.use('/api/technicians', techniciansRouter)
   app.use('/api/jobs', jobsRouter)
+  app.use('/api/stats', statsRouter)
+  app.use('/api/skills', skillsRouter)
 
   app.use(notFoundHandler)
   app.use(errorHandler)
