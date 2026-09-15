@@ -20,6 +20,7 @@ const technician: Technician = {
   ],
   location: makeLocation('Surrey'),
   assignedJobCount: 2,
+  hiredOn: '2019-03-14T00:00:00.000Z',
 }
 
 const jobs: Job[] = [

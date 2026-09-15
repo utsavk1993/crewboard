@@ -18,6 +18,7 @@ function technician(fields: Pick<Technician, 'id' | 'name'> & Partial<Technician
     specialties,
     location,
     assignedJobCount: 0,
+    hiredOn: '2019-03-14T00:00:00.000Z',
     ...fields,
   }
 }

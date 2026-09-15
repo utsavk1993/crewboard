@@ -23,6 +23,7 @@ const technician: Technician = {
   specialties: [panelUpgrades, furnaces],
   location: makeLocation('Surrey'),
   assignedJobCount: 2,
+  hiredOn: '2019-03-14T00:00:00.000Z',
 }
 
 function makeJob(overrides: Partial<Job>): Job {

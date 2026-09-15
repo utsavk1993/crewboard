@@ -1,15 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 
 export const queryKeys = {
   technicians: ['technicians'] as const,
+  // Nested under `technicians`, so anything that refreshes the list refreshes each profile too.
+  technician: (technicianId: string) => ['technicians', technicianId] as const,
   jobs: ['jobs'] as const,
   unassignedJobs: ['jobs', 'unassigned'] as const,
   technicianJobs: (technicianId: string) => ['jobs', 'technician', technicianId] as const,
 }
 
+// Retries once, but not client errors: a 404 or a 400 will fail the same way again.
+export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
+  if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false
+  return failureCount < 1
+}
+
 export function useTechnicians() {
   return useQuery({ queryKey: queryKeys.technicians, queryFn: api.getTechnicians })
+}
+
+export function useTechnician(technicianId: string) {
+  return useQuery({ queryKey: queryKeys.technician(technicianId), queryFn: () => api.getTechnician(technicianId) })
 }
 
 export function useUnassignedJobs() {

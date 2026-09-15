@@ -13,6 +13,7 @@ const technician: Technician = {
   specialties: [makeSpecialty('Electrical', 'Trades')],
   location: makeLocation('North'),
   assignedJobCount: 2,
+  hiredOn: '2019-03-14T00:00:00.000Z',
 }
 
 function jsonResponse(status: number, body: unknown) {

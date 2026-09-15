@@ -40,6 +40,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   getTechnicians: () => request<Technician[]>('/technicians'),
+  getTechnician: (id: string) => request<Technician>(`/technicians/${encodeURIComponent(id)}`),
   getUnassignedJobs: () => request<Job[]>('/jobs?unassigned=true'),
   getTechnicianJobs: (technicianId: string) =>
     request<Job[]>(`/jobs?technicianId=${encodeURIComponent(technicianId)}`),
