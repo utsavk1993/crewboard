@@ -3,7 +3,6 @@ import { z } from 'zod'
 import { prisma } from '../db'
 import { HttpError, validate } from '../errors'
 import type { Prisma } from '../generated/prisma/client'
-import { assignedJobWhere } from '../job-status'
 import { locationSelect, toLocation } from '../locations'
 import { skillSelect } from '../skills'
 
@@ -21,15 +20,15 @@ const technicianSelect = {
     select: { skill: { select: skillSelect } },
     orderBy: [{ skill: { category: { name: 'asc' } } }, { skill: { name: 'asc' } }],
   },
-  // Completed and cancelled jobs stay linked as history but don't count toward workload.
-  _count: { select: { jobs: { where: assignedJobWhere } } },
+  // Stored counter of ASSIGNED jobs, so completed and cancelled history never counts and no per-row count query runs.
+  activeJobCount: true,
 } satisfies Prisma.TechnicianSelect
 
 type TechnicianRow = Prisma.TechnicianGetPayload<{ select: typeof technicianSelect }>
 
 // `skills` lists the same specialties by name, in the same order, for clients that only read names.
 // `region` is the home base city name, for clients that still read the old free-text field.
-function toTechnician({ city, skills, _count, ...technician }: TechnicianRow) {
+function toTechnician({ city, skills, activeJobCount, ...technician }: TechnicianRow) {
   const specialties = skills.map(({ skill }) => skill)
   return {
     ...technician,
@@ -37,7 +36,7 @@ function toTechnician({ city, skills, _count, ...technician }: TechnicianRow) {
     location: toLocation(city),
     skills: specialties.map(({ name }) => name),
     specialties,
-    assignedJobCount: _count.jobs,
+    assignedJobCount: activeJobCount,
   }
 }
 

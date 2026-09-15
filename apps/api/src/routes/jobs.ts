@@ -6,6 +6,7 @@ import type { Prisma } from '../generated/prisma/client'
 import { activeJobWhere, assignedJobWhere, isClosedJobStatus, openJobWhere } from '../job-status'
 import { locationSelect, toLocation } from '../locations'
 import { skillSelect } from '../skills'
+import { changeActiveJobCount } from '../workload-counter'
 
 export const jobsRouter = Router()
 
@@ -92,13 +93,18 @@ async function assignJob(jobId: string, technicianId: string) {
   if (!job) throw jobNotFound()
   if (!technician) throw new HttpError(404, 'TECHNICIAN_NOT_FOUND', 'Technician not found.')
 
-  // Conditional update: only one of two concurrent assignments can match an open job, and closed jobs never match.
-  const { count } = await prisma.job.updateMany({
-    where: { id: jobId, ...openJobWhere },
-    data: { status: 'ASSIGNED', technicianId, assignedAt: new Date() },
+  const assigned = await prisma.$transaction(async (tx) => {
+    // Conditional update: only one of two concurrent assignments can match an open job, and closed jobs never match.
+    const { count } = await tx.job.updateMany({
+      where: { id: jobId, ...openJobWhere },
+      data: { status: 'ASSIGNED', technicianId, assignedAt: new Date() },
+    })
+    // Only the assignment that actually took the job moves the counter, and both commit together.
+    if (count === 1) await changeActiveJobCount(tx, technicianId, 1)
+    return count === 1
   })
 
-  if (count === 0) {
+  if (!assigned) {
     const current = await prisma.job.findUnique({ where: { id: jobId }, select: { status: true, technicianId: true } })
     if (!current) throw jobNotFound()
     if (isClosedJobStatus(current.status)) throw jobClosed('assigned')
@@ -114,19 +120,27 @@ async function assignJob(jobId: string, technicianId: string) {
   return toJob(await prisma.job.findUniqueOrThrow({ where: { id: jobId }, select: jobSelect }))
 }
 
-async function unassignJob(jobId: string) {
-  // Conditional update, like assigning: a job that was closed in the meantime never matches.
-  const { count } = await prisma.job.updateMany({
-    where: { id: jobId, ...assignedJobWhere },
-    data: { status: 'OPEN', technicianId: null, assignedAt: null },
-  })
+async function unassignJob(jobId: string): Promise<ReturnType<typeof toJob>> {
+  const current = await prisma.job.findUnique({ where: { id: jobId }, select: { status: true, technicianId: true } })
+  if (!current) throw jobNotFound()
+  if (isClosedJobStatus(current.status)) throw jobClosed('unassigned')
 
-  if (count === 0) {
-    const current = await prisma.job.findUnique({ where: { id: jobId }, select: { status: true } })
-    if (!current) throw jobNotFound()
-    if (isClosedJobStatus(current.status)) throw jobClosed('unassigned')
-    // Idempotent: unassigning an open job succeeds without changes.
+  const holder = current.status === 'ASSIGNED' ? current.technicianId : null
+  if (holder) {
+    const released = await prisma.$transaction(async (tx) => {
+      // Conditional update, like assigning, but also on the holder read above: the job only goes back to open
+      // if that technician still holds it, so their counter is the one that drops, in the same commit.
+      const { count } = await tx.job.updateMany({
+        where: { id: jobId, ...assignedJobWhere, technicianId: holder },
+        data: { status: 'OPEN', technicianId: null, assignedAt: null },
+      })
+      if (count === 1) await changeActiveJobCount(tx, holder, -1)
+      return count === 1
+    })
+    // Another request changed the job after it was read (unassigned, reassigned or closed it): decide again from its new state.
+    if (!released) return unassignJob(jobId)
   }
+  // Otherwise the job is open, and unassigning it is an idempotent no-op.
 
   return toJob(await prisma.job.findUniqueOrThrow({ where: { id: jobId }, select: jobSelect }))
 }

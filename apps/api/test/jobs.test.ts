@@ -13,6 +13,17 @@ const assignedJobCount = async (technicianId: string) => {
   return res.body.find((t: { id: string }) => t.id === technicianId).assignedJobCount
 }
 
+// Every technician's stored counter must equal a fresh count of the ASSIGNED jobs they hold.
+const expectExactCounters = async () => {
+  const technicians = await prisma.technician.findMany({
+    orderBy: { id: 'asc' },
+    select: { id: true, activeJobCount: true, _count: { select: { jobs: { where: { status: 'ASSIGNED' } } } } },
+  })
+  expect(technicians.map(({ id, activeJobCount }) => [id, activeJobCount])).toEqual(
+    technicians.map(({ id, _count }) => [id, _count.jobs]),
+  )
+}
+
 const britishColumbia = { code: 'BC', name: 'British Columbia' }
 const metroVancouver = (city: { id: string; name: string }) => ({
   city,
@@ -159,6 +170,7 @@ describe('PATCH /api/jobs/:id/assignment', () => {
     })
     expect(new Date(res.body.assignedAt).getTime()).toBeGreaterThanOrEqual(before - 1000)
     expect(await assignedJobCount(ids.carol)).toBe(1)
+    await expectExactCounters()
 
     const unassigned = await request(app).get('/api/jobs?unassigned=true')
     expect(unassigned.body.map((job: { id: string }) => job.id)).toEqual([ids.unassignedFaucetJob])
@@ -173,6 +185,8 @@ describe('PATCH /api/jobs/:id/assignment', () => {
       message: 'This job is already assigned to another technician.',
     })
     expect(await assignedJobCount(ids.bob)).toBe(1)
+    expect(await assignedJobCount(ids.carol)).toBe(0)
+    await expectExactCounters()
   })
 
   it('returns 409 when the job is already assigned to the same technician', async () => {
@@ -184,6 +198,7 @@ describe('PATCH /api/jobs/:id/assignment', () => {
       message: 'This job is already assigned to this technician.',
     })
     expect(await assignedJobCount(ids.bob)).toBe(1)
+    await expectExactCounters()
   })
 
   it.each([
@@ -196,6 +211,7 @@ describe('PATCH /api/jobs/:id/assignment', () => {
     expect(res.body.error).toEqual({ code: 'JOB_CLOSED', message: "This job is closed and can't be assigned." })
     expect(await prisma.job.findUnique({ where: { id: jobId }, select: { status: true, technicianId: true } })).toEqual(unchanged)
     expect(await assignedJobCount(ids.bob)).toBe(1)
+    await expectExactCounters()
   })
 
   it('assigns a job again after it was unassigned back to open', async () => {
@@ -206,15 +222,20 @@ describe('PATCH /api/jobs/:id/assignment', () => {
     expect(res.body).toMatchObject({ id: ids.aliceAcJob, status: 'ASSIGNED', technicianId: ids.bob })
     expect(await assignedJobCount(ids.alice)).toBe(1)
     expect(await assignedJobCount(ids.bob)).toBe(2)
+    await expectExactCounters()
   })
 
-  it('lets only one of two concurrent assignments win', async () => {
+  it('lets only one of two concurrent assignments win, counting the job exactly once', async () => {
     const results = await Promise.all([
       assignment(ids.unassignedFaucetJob, { technicianId: ids.bob }),
       assignment(ids.unassignedFaucetJob, { technicianId: ids.carol }),
     ])
 
     expect(results.map((res) => res.status).sort()).toEqual([200, 409])
+    const winner = results.find((res) => res.status === 200)!.body.technicianId
+    const [bob, carol] = [await assignedJobCount(ids.bob), await assignedJobCount(ids.carol)]
+    expect({ bob, carol }).toEqual(winner === ids.bob ? { bob: 2, carol: 0 } : { bob: 1, carol: 1 })
+    await expectExactCounters()
   })
 
   it('returns 404 for an unknown technician', async () => {
@@ -275,6 +296,7 @@ describe('PATCH /api/jobs/:id/assignment', () => {
       skill: { id: ids.airConditioning, name: 'Air Conditioning', category: { id: ids.hvac, name: 'HVAC' } },
     })
     expect(await assignedJobCount(ids.alice)).toBe(1)
+    await expectExactCounters()
 
     const unassigned = await request(app).get('/api/jobs?unassigned=true')
     expect(unassigned.body.map((job: { id: string }) => job.id)).toContain(ids.aliceAcJob)
@@ -285,6 +307,22 @@ describe('PATCH /api/jobs/:id/assignment', () => {
 
     expect(res.status).toBe(200)
     expect(res.body).toMatchObject({ id: ids.unassignedFaucetJob, status: 'OPEN', technicianId: null, assignedAt: null })
+    expect(await assignedJobCount(ids.alice)).toBe(2)
+    await expectExactCounters()
+  })
+
+  it('releases a job only once when two unassignments race', async () => {
+    const results = await Promise.all([
+      assignment(ids.aliceAcJob, { technicianId: null }),
+      assignment(ids.aliceAcJob, { technicianId: null }),
+    ])
+
+    expect(results.map((res) => [res.status, res.body.status])).toEqual([
+      [200, 'OPEN'],
+      [200, 'OPEN'],
+    ])
+    expect(await assignedJobCount(ids.alice)).toBe(1)
+    await expectExactCounters()
   })
 
   it.each([
@@ -299,6 +337,8 @@ describe('PATCH /api/jobs/:id/assignment', () => {
       status,
       technicianId,
     })
+    expect(await assignedJobCount(ids.alice)).toBe(2)
+    await expectExactCounters()
   })
 
   it('returns 404 when unassigning an unknown job', async () => {

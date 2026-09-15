@@ -1,6 +1,7 @@
 import request from 'supertest'
 import { createApp } from '../src/app'
 import { prisma } from '../src/db'
+import { recomputeActiveJobCounts } from '../src/workload-counter'
 import { ids } from './fixtures'
 
 const app = createApp()
@@ -94,11 +95,25 @@ describe('GET /api/technicians', () => {
       data: { status: 'COMPLETED', completedAt: new Date('2030-01-01T20:00:00Z') },
     })
     await prisma.job.update({ where: { id: ids.bobWaterHeaterJob }, data: { status: 'CANCELLED', technicianId: null, assignedAt: null } })
+    // These writes bypass the API, so recompute the stored counters the way bulk writes do.
+    expect(await recomputeActiveJobCounts(prisma)).toBe(2)
 
     const res = await request(app).get('/api/technicians')
     const counts = Object.fromEntries(res.body.map((technician: { id: string; assignedJobCount: number }) => [technician.id, technician.assignedJobCount]))
 
     expect(counts).toEqual({ [ids.alice]: 1, [ids.bob]: 0, [ids.carol]: 0 })
+  })
+
+  it('reports the stored workload counter in the list and the detail', async () => {
+    await prisma.technician.update({ where: { id: ids.carol }, data: { activeJobCount: 7 } })
+
+    const [list, detail] = await Promise.all([
+      request(app).get('/api/technicians'),
+      request(app).get(`/api/technicians/${ids.carol}`),
+    ])
+
+    expect(list.body.find((technician: { id: string }) => technician.id === ids.carol).assignedJobCount).toBe(7)
+    expect(detail.body.assignedJobCount).toBe(7)
   })
 
   it('returns an empty list of specialties for a technician without any', async () => {

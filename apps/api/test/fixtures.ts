@@ -1,4 +1,5 @@
 import { prisma } from '../src/db'
+import { recomputeActiveJobCounts } from '../src/workload-counter'
 
 export const ids = {
   alice: '11111111-1111-4111-8111-111111111111',
@@ -134,6 +135,7 @@ export async function resetDatabase() {
         },
       ],
     }),
+    recomputeActiveJobCounts(prisma),
   ])
 }
 
