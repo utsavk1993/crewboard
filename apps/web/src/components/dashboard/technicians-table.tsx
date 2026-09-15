@@ -13,7 +13,6 @@ import {
   type FilterFn,
 } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Search, SearchX, Users, type LucideIcon } from 'lucide-react'
-import { SkillBadge } from '@/components/dashboard/skill-badge'
 import { TechnicianAvatar } from '@/components/dashboard/technician-avatar'
 import { WorkloadMeter } from '@/components/dashboard/workload-meter'
 import { Badge } from '@/components/ui/badge'
@@ -22,7 +21,9 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import type { Technician } from '@/lib/types'
+import { groupSpecialties, type SpecialtyGroup } from '@/lib/skills'
+import { matchesTechnicianSearch } from '@/lib/technician-search'
+import type { Location, Specialty, Technician } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 export type TechniciansTableProps = {
@@ -48,18 +49,15 @@ const features = tableFeatures({
 
 type Features = typeof features
 
-const MAX_VISIBLE_SKILLS = 2
+const MAX_VISIBLE_CATEGORIES = 2
 const SKELETON_ROW_COUNT = 6
 
 const compareNames = (a: Technician, b: Technician) => a.name.localeCompare(b.name)
 
-// Matches the whole technician rather than one cell, so email and every skill are searchable
-// even though they aren't separate columns.
-const matchesSearch: FilterFn<Features, Technician> = (row, _columnId, term: string) => {
-  const needle = term.toLowerCase()
-  const { name, email, designation, region, skills } = row.original
-  return [name, email, designation, region, ...skills].some((field) => field.toLowerCase().includes(needle))
-}
+// Matches the whole technician rather than one cell, so email, every specialty and the full location
+// are searchable even though they aren't all shown.
+const matchesSearch: FilterFn<Features, Technician> = (row, _columnId, term: string) =>
+  matchesTechnicianSearch(row.original, term)
 
 function pluralizeTechnicians(count: number) {
   return count === 1 ? 'technician' : 'technicians'
@@ -106,29 +104,84 @@ function TechnicianCell({ technician }: { technician: Technician }) {
   )
 }
 
-function SkillList({ skills }: { skills: string[] }) {
-  const visible = skills.slice(0, MAX_VISIBLE_SKILLS)
-  const overflow = skills.slice(MAX_VISIBLE_SKILLS)
+const specialtyNames = (group: SpecialtyGroup) => group.specialties.map((specialty) => specialty.name).join(', ')
+
+// The accessible name starts with the visible label and carries the tooltip's text, so screen reader
+// users get the details without opening it.
+function BadgeWithTooltip({
+  label,
+  accessibleName,
+  children,
+}: {
+  label: string
+  accessibleName: string
+  children: ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {/* A button so keyboard users can focus it to reveal the tooltip. */}
+        <Badge
+          asChild
+          variant="outline"
+          className="font-normal text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        >
+          <button type="button" aria-label={accessibleName}>
+            {label}
+          </button>
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent>{children}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+function SkillCategories({ specialties }: { specialties: Specialty[] }) {
+  const groups = groupSpecialties(specialties)
+  const visible = groups.slice(0, MAX_VISIBLE_CATEGORIES)
+  const overflow = groups.slice(MAX_VISIBLE_CATEGORIES)
+
+  if (groups.length === 0) {
+    return <span className="text-xs text-muted-foreground">No skills listed</span>
+  }
 
   return (
     <div className="flex items-center gap-1">
-      {visible.map((skill) => (
-        <SkillBadge key={skill} skill={skill} />
+      {visible.map((group) => (
+        <BadgeWithTooltip
+          key={group.category.id}
+          label={group.category.name}
+          accessibleName={`${group.category.name}: ${specialtyNames(group)}`}
+        >
+          {specialtyNames(group)}
+        </BadgeWithTooltip>
       ))}
       {overflow.length > 0 && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            {/* A button so keyboard users can focus it to reveal the tooltip. */}
-            <Badge asChild variant="outline" className="text-muted-foreground">
-              <button type="button">
-                +{overflow.length}
-                <span className="sr-only"> more skills: {overflow.join(', ')}</span>
-              </button>
-            </Badge>
-          </TooltipTrigger>
-          <TooltipContent>{overflow.join(', ')}</TooltipContent>
-        </Tooltip>
+        <BadgeWithTooltip
+          label={`+${overflow.length}`}
+          accessibleName={`+${overflow.length} more ${overflow.length === 1 ? 'category' : 'categories'}: ${overflow
+            .map((group) => `${group.category.name}: ${specialtyNames(group)}`)
+            .join('; ')}`}
+        >
+          <div className="flex flex-col gap-1.5">
+            {overflow.map((group) => (
+              <div key={group.category.id}>
+                <div className="font-medium">{group.category.name}</div>
+                <div className="text-muted-foreground">{specialtyNames(group)}</div>
+              </div>
+            ))}
+          </div>
+        </BadgeWithTooltip>
       )}
+    </div>
+  )
+}
+
+function LocationCell({ location }: { location: Location }) {
+  return (
+    <div className="flex flex-col whitespace-nowrap">
+      <span className="text-sm">{location.city.name}</span>
+      <span className="text-xs text-muted-foreground">{location.region.name}</span>
     </div>
   )
 }
@@ -152,16 +205,16 @@ function buildColumns(
       cell: ({ getValue }) => <span className="whitespace-nowrap">{getValue()}</span>,
       meta: { className: 'hidden md:table-cell' },
     }),
-    columnHelper.accessor('skills', {
+    columnHelper.accessor('specialties', {
       header: 'Skills',
       enableSorting: false,
-      cell: ({ getValue }) => <SkillList skills={getValue()} />,
+      cell: ({ getValue }) => <SkillCategories specialties={getValue()} />,
       meta: { className: 'hidden sm:table-cell' },
     }),
-    columnHelper.accessor('region', {
-      header: 'Region',
+    columnHelper.accessor('location', {
+      header: 'Location',
       enableSorting: false,
-      cell: ({ getValue }) => <span className="whitespace-nowrap">{getValue()}</span>,
+      cell: ({ getValue }) => <LocationCell location={getValue()} />,
       meta: { className: 'hidden lg:table-cell' },
     }),
     columnHelper.accessor('assignedJobCount', {
@@ -203,13 +256,18 @@ const skeletonCells: Record<string, ReactNode> = {
     </div>
   ),
   designation: <Skeleton className="h-3.5 w-28" />,
-  skills: (
+  specialties: (
     <div className="flex gap-1">
-      <Skeleton className="h-5 w-14" />
       <Skeleton className="h-5 w-16" />
+      <Skeleton className="h-5 w-20" />
     </div>
   ),
-  region: <Skeleton className="h-3.5 w-16" />,
+  location: (
+    <div className="flex flex-col gap-1.5">
+      <Skeleton className="h-3.5 w-20" />
+      <Skeleton className="h-3 w-28" />
+    </div>
+  ),
   assignedJobCount: <Skeleton className="h-3.5 w-28" />,
   actions: (
     <div className="flex justify-end gap-1">
@@ -308,7 +366,7 @@ export function TechniciansTable({ technicians, loading, onAssign, onViewJobs }:
               <StateMessage
                 icon={SearchX}
                 title={`No technicians match “${term}”`}
-                description="Try a different name, skill or region."
+                description="Try a different name, skill or city."
               >
                 <Button variant="ghost" size="sm" className="mt-2" onClick={clearSearch}>
                   Clear search
@@ -343,7 +401,7 @@ export function TechniciansTable({ technicians, loading, onAssign, onViewJobs }:
             ref={searchInputRef}
             type="search"
             aria-label="Search technicians"
-            placeholder="Search name, skill, region…"
+            placeholder="Search name, skill, city…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             className="pl-9"
