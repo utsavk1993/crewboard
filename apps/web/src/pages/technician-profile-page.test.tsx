@@ -1,12 +1,14 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
 import { App } from '@/App'
 import { ThemeProvider } from '@/components/theme/theme-provider'
+import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { api, ApiError } from '@/lib/api'
 import { formatDate, formatMonthYear, formatTenure } from '@/lib/format'
+import type { Job } from '@/lib/types'
 import { makeJob, makeLocation, makeSpecialty, makeTechnician } from '@/test/factories'
 
 jest.mock('@/lib/api', () => ({
@@ -95,6 +97,7 @@ function renderApp(path = '/technicians/ada') {
             <App />
           </TooltipProvider>
         </QueryClientProvider>
+        <Toaster />
       </ThemeProvider>
     </MemoryRouter>,
   )
@@ -165,7 +168,7 @@ describe('TechnicianProfilePage', () => {
 
     const list = await screen.findByRole('list', { name: 'Assigned jobs' })
     const items = within(list).getAllByRole('listitem')
-    expect(items.map((item) => within(item).getByText(/^(Install|Replace|Service)/).textContent)).toEqual([
+    expect(items.map((item) => within(item).getByText(/^(Install|Replace|Service)/, { selector: 'p' }).textContent)).toEqual([
       'Replace breaker panel',
       'Service heat pump',
       'Install EV charger',
@@ -178,8 +181,7 @@ describe('TechnicianProfilePage', () => {
     expect(panel.getByText('Richmond')).toBeInTheDocument()
     expect(panel.getByText(`Scheduled ${formatDate('2001-01-01T00:00:00.000Z')}`)).toBeInTheDocument()
 
-    // Read-only: the profile doesn't change assignments.
-    expect(within(list).queryByRole('button')).not.toBeInTheDocument()
+    expect(panel.getByRole('button', { name: 'Unassign Replace breaker panel' })).toBeEnabled()
   })
 
   it('shows empty states when the technician has no jobs', async () => {
@@ -241,6 +243,135 @@ describe('TechnicianProfilePage', () => {
 
     expect(await screen.findByRole('list', { name: 'Assigned jobs' })).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  describe('assignments', () => {
+    const thermostat = makeJob({
+      id: 'thermostat',
+      title: 'Install smart thermostat',
+      skill: makeSpecialty('Heat Pumps', 'HVAC'),
+      location: makeLocation('Surrey'),
+    })
+
+    // A tiny in-memory API so assignments change what the next refetch returns, like the real server.
+    let store: Job[]
+
+    beforeEach(() => {
+      store = [...jobs, thermostat]
+      mockApi.getTechnician.mockImplementation(async (id) => {
+        if (id !== ada.id) throw new ApiError('Technician not found.', 404, 'TECHNICIAN_NOT_FOUND')
+        return { ...ada, assignedJobCount: store.filter((job) => job.technicianId === id).length }
+      })
+      mockApi.getTechnicianJobs.mockImplementation(async (id) => store.filter((job) => job.technicianId === id))
+      mockApi.getUnassignedJobs.mockImplementation(async () => store.filter((job) => job.technicianId === null))
+      mockApi.setAssignment.mockImplementation(async (jobId, technicianId) => {
+        store = store.map((job) => (job.id === jobId ? { ...job, technicianId } : job))
+        return store.find((job) => job.id === jobId)!
+      })
+    })
+
+    const jobList = () => screen.findByRole('list', { name: 'Assigned jobs' })
+    const workloadMeter = () => within(card('Workload')).getByRole('meter', { name: 'Ada Lovelace workload' })
+    // Each Unassign button repeats the title for screen readers, so match the visible title only.
+    const jobTitle = (list: HTMLElement, title: string) => within(list).queryByText(title, { selector: 'p' })
+    const jobItem = (list: HTMLElement, title: string) => jobTitle(list, title)?.closest('li') as HTMLElement
+    const unassignButtons = (list: HTMLElement) => within(list).getAllByRole('button', { name: /^(Loading )?Unassign/ })
+
+    async function pickJobInDialog(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(await screen.findByRole('button', { name: 'Assign job' }))
+      const dialog = await screen.findByRole('dialog')
+      expect(dialog).toHaveTextContent('Assign job to Ada Lovelace')
+      await user.click(await within(dialog).findByRole('button', { name: /Install smart thermostat/ }))
+      await user.click(within(dialog).getByRole('button', { name: 'Assign job' }))
+      return dialog
+    }
+
+    it('assigns a job from the header and refreshes the jobs and workload', async () => {
+      const user = renderApp()
+      await profileHeading()
+
+      await pickJobInDialog(user)
+
+      expect(mockApi.setAssignment).toHaveBeenCalledWith('thermostat', 'ada')
+      expect(await screen.findByText('Assigned “Install smart thermostat” to Ada Lovelace')).toBeInTheDocument()
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+      const list = await jobList()
+      await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(4))
+      expect(jobTitle(list, 'Install smart thermostat')).toBeInTheDocument()
+      expect(workloadMeter()).toHaveAttribute('aria-valuenow', '4')
+    })
+
+    it('keeps the dialog open with the error when the job can no longer be assigned', async () => {
+      mockApi.setAssignment.mockRejectedValueOnce(
+        new ApiError("This job is closed and can't be assigned.", 409, 'JOB_CLOSED'),
+      )
+      const user = renderApp()
+      await profileHeading()
+
+      const dialog = await pickJobInDialog(user)
+
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        "This job is closed and can't be assigned.",
+      )
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(within(dialog).getByRole('button', { name: 'Assign job' })).toBeEnabled()
+    })
+
+    it('unassigns a job and refreshes the jobs and workload', async () => {
+      const user = renderApp()
+      const list = await jobList()
+
+      await user.click(within(list).getByRole('button', { name: 'Unassign Service heat pump' }))
+
+      expect(mockApi.setAssignment).toHaveBeenCalledWith('heat-pump', null)
+      expect(await screen.findByText('Unassigned “Service heat pump”')).toBeInTheDocument()
+      await waitFor(() => expect(jobTitle(list, 'Service heat pump')).not.toBeInTheDocument())
+      expect(within(list).getAllByRole('listitem')).toHaveLength(2)
+      expect(workloadMeter()).toHaveAttribute('aria-valuenow', '2')
+      expect(within(card('Workload')).getByRole('heading', { name: 'Next scheduled job' }).parentElement).toHaveTextContent(
+        'Install EV charger',
+      )
+    })
+
+    it('shows a toast and keeps the job when unassigning fails', async () => {
+      mockApi.setAssignment.mockRejectedValueOnce(new ApiError('Something went wrong. Please try again.', 500))
+      const user = renderApp()
+      const list = await jobList()
+
+      await user.click(within(list).getByRole('button', { name: 'Unassign Service heat pump' }))
+
+      expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument()
+      await waitFor(() => unassignButtons(list).forEach((button) => expect(button).toBeEnabled()))
+      expect(jobItem(list, 'Service heat pump')).toBeInTheDocument()
+      expect(workloadMeter()).toHaveAttribute('aria-valuenow', '3')
+    })
+
+    it('shows a spinner on the job being unassigned and disables every unassign button meanwhile', async () => {
+      let finish = () => {}
+      mockApi.setAssignment.mockImplementationOnce(
+        (jobId, technicianId) =>
+          new Promise((resolve) => {
+            finish = () => {
+              store = store.map((job) => (job.id === jobId ? { ...job, technicianId } : job))
+              resolve(store.find((job) => job.id === jobId)!)
+            }
+          }),
+      )
+      const user = renderApp()
+      const list = await jobList()
+
+      await user.click(within(list).getByRole('button', { name: 'Unassign Service heat pump' }))
+
+      expect(await within(jobItem(list, 'Service heat pump')).findByRole('status')).toBeInTheDocument()
+      expect(within(jobItem(list, 'Install EV charger')).queryByRole('status')).not.toBeInTheDocument()
+      unassignButtons(list).forEach((button) => expect(button).toBeDisabled())
+
+      finish()
+
+      await waitFor(() => expect(jobTitle(list, 'Service heat pump')).not.toBeInTheDocument())
+      unassignButtons(list).forEach((button) => expect(button).toBeEnabled())
+    })
   })
 
   it('opens from a technician’s name on the board and links back to it', async () => {
