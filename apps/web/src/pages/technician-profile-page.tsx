@@ -1,6 +1,7 @@
 import { ArrowLeftIcon, CircleAlertIcon, RotateCwIcon, UserRoundXIcon } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { AssignedJobsCard, JobItemSkeleton } from '@/components/profile/assigned-jobs-card'
+import { useAssignmentActions } from '@/components/dashboard/use-assignment-actions'
 import { ProfileHeader } from '@/components/profile/profile-header'
 import { DetailsCard, SkillsCard, WorkloadCard } from '@/components/profile/profile-aside'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -100,6 +101,9 @@ export function TechnicianProfilePage() {
   const { technicianId = '' } = useParams()
   const technician = useTechnician(technicianId)
   const jobs = useTechnicianJobs(technicianId)
+  const { openAssign, unassign, pendingJobId, assignDialog } = useAssignmentActions(
+    technician.data && [technician.data],
+  )
 
   useDocumentTitle(technician.data?.name ?? 'Technician')
 
@@ -113,7 +117,7 @@ export function TechnicianProfilePage() {
       const jobsError = jobs.isError ? errorMessage(jobs.error) : null
       return (
         <>
-          <ProfileHeader technician={technician.data} />
+          <ProfileHeader technician={technician.data} onAssign={openAssign} />
           <div className="grid items-start gap-6 lg:grid-cols-3">
             <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
               <AssignedJobsCard
@@ -121,6 +125,8 @@ export function TechnicianProfilePage() {
                 error={jobsError}
                 retrying={jobs.isFetching}
                 onRetry={() => jobs.refetch()}
+                pendingJobId={pendingJobId}
+                onUnassign={unassign}
               />
             </div>
             <aside aria-label="Technician summary" className="flex min-w-0 flex-col gap-6">
@@ -162,6 +168,7 @@ export function TechnicianProfilePage() {
     <div className="flex flex-col gap-4">
       <BackLink />
       <div className="flex flex-col gap-6">{renderContent()}</div>
+      {assignDialog}
     </div>
   )
 }

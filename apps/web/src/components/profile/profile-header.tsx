@@ -1,4 +1,4 @@
-import { MailIcon, PhoneIcon } from 'lucide-react'
+import { MailIcon, PhoneIcon, PlusIcon } from 'lucide-react'
 import { TechnicianAvatar } from '@/components/dashboard/technician-avatar'
 import { Badge, type BadgeProps } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,7 +13,12 @@ const workloadBadges: Record<WorkloadLevel, { variant: BadgeProps['variant']; cl
   heavy: { variant: 'destructive' },
 }
 
-export function ProfileHeader({ technician }: { technician: Technician }) {
+export interface ProfileHeaderProps {
+  technician: Technician
+  onAssign: (technician: Technician) => void
+}
+
+export function ProfileHeader({ technician, onAssign }: ProfileHeaderProps) {
   const level = getWorkloadLevel(technician.assignedJobCount)
   const badge = workloadBadges[level]
 
@@ -33,7 +38,7 @@ export function ProfileHeader({ technician }: { technician: Technician }) {
           </div>
         </div>
 
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           <Button variant="outline" size="sm" asChild>
             <a href={`mailto:${technician.email}`}>
               <MailIcon aria-hidden="true" />
@@ -45,6 +50,10 @@ export function ProfileHeader({ technician }: { technician: Technician }) {
               <PhoneIcon aria-hidden="true" />
               Call
             </a>
+          </Button>
+          <Button size="sm" onClick={() => onAssign(technician)}>
+            <PlusIcon aria-hidden="true" />
+            Assign job
           </Button>
         </div>
       </CardContent>
