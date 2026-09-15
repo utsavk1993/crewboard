@@ -15,6 +15,14 @@ enum Priority {
   URGENT
 }
 
+/// OPEN and ASSIGNED jobs are active work; COMPLETED and CANCELLED jobs are closed history.
+enum JobStatus {
+  OPEN
+  ASSIGNED
+  COMPLETED
+  CANCELLED
+}
+
 model SkillCategory {
   id   String @id @default(uuid()) @db.Uuid
   name String @unique
@@ -120,9 +128,11 @@ model Job {
   skill         Skill       @relation(fields: [skillId], references: [id])
   priority      Priority
   scheduledDate DateTime    @map("scheduled_date") @db.Date
+  status        JobStatus
   technicianId  String?     @map("technician_id") @db.Uuid
   technician    Technician? @relation(fields: [technicianId], references: [id], onDelete: SetNull)
   assignedAt    DateTime?   @map("assigned_at")
+  completedAt   DateTime?   @map("completed_at")
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
 

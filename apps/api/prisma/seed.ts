@@ -254,6 +254,12 @@ const UNASSIGNED_JOBS_PER_REGION: Record<string, number> = {
 // Share of assigned jobs in the technician's own region; the rest are elsewhere in the same province.
 const IN_REGION_PROBABILITY = 0.85
 
+// Closed history: completed jobs per technician within the last HISTORY_DAYS (or since they were hired),
+// plus jobs customers cancelled before anyone was assigned.
+const COMPLETED_JOBS_PER_TECHNICIAN: [min: number, max: number] = [2, 6]
+const HISTORY_DAYS = 120
+const CANCELLED_JOBS = 8
+
 type SeedCategory = { id: string; name: string }
 type SeedSkill = { id: string; name: string; categoryId: string }
 type SeedRegion = { id: string; name: string; provinceCode: string }
@@ -354,10 +360,16 @@ function job(skill: SeedSkill, technicianId: string | null, city: SeedCity, prov
     skillId: skill.id,
     priority: priority(),
     scheduledDate: scheduledDate(),
+    status: technicianId ? ('ASSIGNED' as const) : ('OPEN' as const),
     technicianId,
     assignedAt: technicianId ? faker.date.recent({ days: 5 }) : null,
   }
 }
+
+const utcDaysAgo = (today: Date, days: number) =>
+  new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - days))
+
+const addMinutes = (date: Date, minutes: number) => new Date(date.getTime() + minutes * 60_000)
 
 async function main() {
   const { provinces, regions, cities } = buildGeography()
@@ -408,12 +420,50 @@ async function main() {
 
   // Hire dates are drawn after everything else, so they don't shift any other seeded value.
   const today = new Date()
-  const technicians = roster.map(({ technician }) => {
+  const tenureDays = roster.map(({ technician }) => {
     const [min, max] = TENURE_DAYS[technician.designation]!
-    const daysAgo = faker.number.int({ min, max })
+    return faker.number.int({ min, max })
+  })
+  const technicians = roster.map(({ technician }, index) => ({
+    ...technician,
+    hiredOn: utcDaysAgo(today, tenureDays[index]!),
+  }))
+
+  // History is drawn last of all, so it doesn't shift technicians, hire dates or active jobs.
+  // Each completed job was assigned up to a week before its scheduled day (never before the hire date)
+  // and completed during that day.
+  const completedJobs = roster.flatMap(({ technician, city: home, specialties }, index) => {
+    const [min, max] = COMPLETED_JOBS_PER_TECHNICIAN
+    const windowDays = Math.min(HISTORY_DAYS, tenureDays[index]! - 8)
+    return Array.from({ length: faker.number.int({ min, max }) }, () => {
+      const inRegion = faker.datatype.boolean({ probability: IN_REGION_PROBABILITY })
+      const city = faker.helpers.arrayElement(inRegion ? citiesInRegion(home.regionId) : citiesElsewhereInProvince(home))
+      const scheduled = utcDaysAgo(today, faker.number.int({ min: 1, max: windowDays }))
+      const assignedAt = addMinutes(scheduled, -faker.number.int({ min: 12 * 60, max: 7 * 24 * 60 }))
+      // 16:00–23:59 UTC is roughly business hours in BC and Alberta.
+      const completedAt = addMinutes(scheduled, faker.number.int({ min: 16 * 60, max: 24 * 60 - 1 }))
+      return {
+        ...job(faker.helpers.arrayElement(specialties), technician.id, city, provinceCodeOf(city)),
+        scheduledDate: scheduled,
+        status: 'COMPLETED' as const,
+        assignedAt,
+        completedAt,
+        createdAt: addMinutes(assignedAt, -faker.number.int({ min: 0, max: 3 * 24 * 60 })),
+        updatedAt: completedAt,
+      }
+    })
+  })
+  const cancelledJobs = Array.from({ length: CANCELLED_JOBS }, (_, index) => {
+    const category = categories[index % categories.length]!
+    const city = faker.helpers.arrayElement(cities)
+    const skill = faker.helpers.arrayElement(skills.filter(({ categoryId }) => categoryId === category.id))
+    const cancelledAt = utcDaysAgo(today, faker.number.int({ min: 1, max: HISTORY_DAYS }))
     return {
-      ...technician,
-      hiredOn: new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - daysAgo)),
+      ...job(skill, null, city, provinceCodeOf(city)),
+      scheduledDate: addMinutes(cancelledAt, faker.number.int({ min: 1, max: 14 }) * 24 * 60),
+      status: 'CANCELLED' as const,
+      createdAt: addMinutes(cancelledAt, -faker.number.int({ min: 1, max: 10 }) * 24 * 60),
+      updatedAt: addMinutes(cancelledAt, faker.number.int({ min: 16 * 60, max: 24 * 60 - 1 })),
     }
   })
 
@@ -434,12 +484,14 @@ async function main() {
     prisma.skill.createMany({ data: skills }),
     prisma.technician.createMany({ data: technicians }),
     prisma.technicianSkill.createMany({ data: technicianSkills }),
-    prisma.job.createMany({ data: [...assignedJobs, ...unassignedJobs] }),
+    prisma.job.createMany({ data: [...assignedJobs, ...unassignedJobs, ...completedJobs, ...cancelledJobs] }),
   ])
 
+  const activeCount = assignedJobs.length + unassignedJobs.length
   console.log(
-    `Seeded ${technicians.length} technicians and ${assignedJobs.length + unassignedJobs.length} jobs ` +
-      `(${assignedJobs.length} assigned, ${unassignedJobs.length} unassigned).`,
+    `Seeded ${technicians.length} technicians and ${activeCount} active jobs ` +
+      `(${assignedJobs.length} assigned, ${unassignedJobs.length} open), ` +
+      `plus ${completedJobs.length} completed and ${cancelledJobs.length} cancelled.`,
   )
 }
 

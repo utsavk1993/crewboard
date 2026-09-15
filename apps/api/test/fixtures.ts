@@ -9,6 +9,8 @@ export const ids = {
   bobWaterHeaterJob: 'aaaaaaaa-0000-4000-8000-000000000003',
   unassignedDishwasherJob: 'aaaaaaaa-0000-4000-8000-000000000004',
   unassignedFaucetJob: 'aaaaaaaa-0000-4000-8000-000000000005',
+  aliceCompletedJob: 'aaaaaaaa-0000-4000-8000-000000000006',
+  cancelledJob: 'aaaaaaaa-0000-4000-8000-000000000007',
   hvac: 'cccccccc-0000-4000-8000-000000000001',
   electrical: 'cccccccc-0000-4000-8000-000000000002',
   plumbing: 'cccccccc-0000-4000-8000-000000000003',
@@ -119,6 +121,17 @@ export async function resetDatabase() {
         job(ids.bobWaterHeaterJob, 'Replace water heater', ids.waterHeaters, day(2), ids.bob, ids.langley, '20150 56 Ave, Langley, BC V3A 3Y6'),
         job(ids.unassignedDishwasherJob, 'Dishwasher not draining', ids.dishwashers, day(5), null, ids.kelowna, '1560 Bernard Ave, Kelowna, BC V1Y 6R5'),
         job(ids.unassignedFaucetJob, 'Leaking kitchen faucet', ids.fixturesAndFaucets, day(4), null, ids.mapleRidge, '22710 Dewdney Trunk Rd, Maple Ridge, BC V2X 3K4'),
+        // History: closed jobs that stay out of lists and workload counts.
+        {
+          ...job(ids.aliceCompletedJob, 'AC condensate leak', ids.airConditioning, day(-10), ids.alice, ids.surrey, '7350 152 St, Surrey, BC V3S 3L2'),
+          status: 'COMPLETED',
+          assignedAt: new Date('2029-12-18T17:00:00Z'),
+          completedAt: new Date('2029-12-21T22:30:00Z'),
+        },
+        {
+          ...job(ids.cancelledJob, 'No hot water', ids.waterHeaters, day(-5), null, ids.langley, '19900 Fraser Hwy, Langley, BC V3A 4E1'),
+          status: 'CANCELLED',
+        },
       ],
     }),
   ])
@@ -143,7 +156,9 @@ function job(
     skillId,
     priority: 'MEDIUM' as const,
     scheduledDate,
+    status: technicianId ? ('ASSIGNED' as const) : ('OPEN' as const),
     technicianId,
     assignedAt: technicianId ? new Date('2029-12-31T12:00:00Z') : null,
+    completedAt: null,
   }
 }

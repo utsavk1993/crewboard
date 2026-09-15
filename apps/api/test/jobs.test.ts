@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import request from 'supertest'
 import { createApp } from '../src/app'
+import { prisma } from '../src/db'
 import { ids } from './fixtures'
 
 const app = createApp()
@@ -45,9 +46,26 @@ describe('GET /api/jobs', () => {
       skill: { id: ids.panelUpgrades, name: 'Panel Upgrades', category: { id: ids.electrical, name: 'Electrical' } },
       priority: 'MEDIUM',
       scheduledDate: '2030-01-01T00:00:00.000Z',
+      status: 'ASSIGNED',
       technicianId: ids.alice,
       assignedAt: '2029-12-31T12:00:00.000Z',
+      completedAt: null,
     })
+  })
+
+  it('leaves completed and cancelled jobs out of every list', async () => {
+    const closed: string[] = [ids.aliceCompletedJob, ids.cancelledJob]
+    const [all, unassigned, alice] = await Promise.all([
+      request(app).get('/api/jobs'),
+      request(app).get('/api/jobs?unassigned=true'),
+      request(app).get(`/api/jobs?technicianId=${ids.alice}`),
+    ])
+
+    for (const res of [all, unassigned, alice]) {
+      expect(res.status).toBe(200)
+      expect(res.body.filter((job: { id: string }) => closed.includes(job.id))).toEqual([])
+    }
+    expect(all.body.map((job: { status: string }) => job.status).sort()).toEqual(['ASSIGNED', 'ASSIGNED', 'ASSIGNED', 'OPEN', 'OPEN'])
   })
 
   it('includes each job\'s specialty and category', async () => {
@@ -84,14 +102,22 @@ describe('GET /api/jobs', () => {
 
     expect(res.status).toBe(200)
     expect(res.body.map((job: { id: string }) => job.id)).toEqual([ids.unassignedFaucetJob, ids.unassignedDishwasherJob])
-    expect(res.body.every((job: { technicianId: unknown; assignedAt: unknown }) => job.technicianId === null && job.assignedAt === null)).toBe(true)
+    expect(
+      res.body.every(
+        (job: { status: string; technicianId: unknown; assignedAt: unknown }) =>
+          job.status === 'OPEN' && job.technicianId === null && job.assignedAt === null,
+      ),
+    ).toBe(true)
   })
 
-  it("filters a technician's jobs", async () => {
+  it("filters a technician's assigned jobs, leaving out their completed ones", async () => {
     const res = await request(app).get(`/api/jobs?technicianId=${ids.alice}`)
 
     expect(res.status).toBe(200)
-    expect(res.body.map((job: { id: string }) => job.id)).toEqual([ids.aliceBreakerJob, ids.aliceAcJob])
+    expect(res.body.map((job: { id: string; status: string }) => [job.id, job.status])).toEqual([
+      [ids.aliceBreakerJob, 'ASSIGNED'],
+      [ids.aliceAcJob, 'ASSIGNED'],
+    ])
   })
 
   it('rejects an invalid technicianId filter', async () => {
@@ -124,7 +150,9 @@ describe('PATCH /api/jobs/:id/assignment', () => {
     expect(res.status).toBe(200)
     expect(res.body).toMatchObject({
       id: ids.unassignedDishwasherJob,
+      status: 'ASSIGNED',
       technicianId: ids.carol,
+      completedAt: null,
       location: kelowna,
       requiredSkill: 'Dishwashers',
       skill: { id: ids.dishwashers, name: 'Dishwashers', category: { id: ids.applianceRepair, name: 'Appliance Repair' } },
@@ -156,6 +184,28 @@ describe('PATCH /api/jobs/:id/assignment', () => {
       message: 'This job is already assigned to this technician.',
     })
     expect(await assignedJobCount(ids.bob)).toBe(1)
+  })
+
+  it.each([
+    ['completed', ids.aliceCompletedJob, { status: 'COMPLETED', technicianId: ids.alice }],
+    ['cancelled', ids.cancelledJob, { status: 'CANCELLED', technicianId: null }],
+  ])('returns 409 when assigning a %s job and leaves it unchanged', async (_label, jobId, unchanged) => {
+    const res = await assignment(jobId, { technicianId: ids.bob })
+
+    expect(res.status).toBe(409)
+    expect(res.body.error).toEqual({ code: 'JOB_CLOSED', message: "This job is closed and can't be assigned." })
+    expect(await prisma.job.findUnique({ where: { id: jobId }, select: { status: true, technicianId: true } })).toEqual(unchanged)
+    expect(await assignedJobCount(ids.bob)).toBe(1)
+  })
+
+  it('assigns a job again after it was unassigned back to open', async () => {
+    await assignment(ids.aliceAcJob, { technicianId: null })
+    const res = await assignment(ids.aliceAcJob, { technicianId: ids.bob })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({ id: ids.aliceAcJob, status: 'ASSIGNED', technicianId: ids.bob })
+    expect(await assignedJobCount(ids.alice)).toBe(1)
+    expect(await assignedJobCount(ids.bob)).toBe(2)
   })
 
   it('lets only one of two concurrent assignments win', async () => {
@@ -216,20 +266,39 @@ describe('PATCH /api/jobs/:id/assignment', () => {
     expect(res.status).toBe(200)
     expect(res.body).toMatchObject({
       id: ids.aliceAcJob,
+      status: 'OPEN',
       technicianId: null,
       assignedAt: null,
+      completedAt: null,
       location: metroVancouver({ id: ids.surrey, name: 'Surrey' }),
       requiredSkill: 'Air Conditioning',
       skill: { id: ids.airConditioning, name: 'Air Conditioning', category: { id: ids.hvac, name: 'HVAC' } },
     })
     expect(await assignedJobCount(ids.alice)).toBe(1)
+
+    const unassigned = await request(app).get('/api/jobs?unassigned=true')
+    expect(unassigned.body.map((job: { id: string }) => job.id)).toContain(ids.aliceAcJob)
   })
 
   it('treats unassigning an already unassigned job as a no-op', async () => {
     const res = await assignment(ids.unassignedFaucetJob, { technicianId: null })
 
     expect(res.status).toBe(200)
-    expect(res.body).toMatchObject({ id: ids.unassignedFaucetJob, technicianId: null, assignedAt: null })
+    expect(res.body).toMatchObject({ id: ids.unassignedFaucetJob, status: 'OPEN', technicianId: null, assignedAt: null })
+  })
+
+  it.each([
+    ['completed', ids.aliceCompletedJob, 'COMPLETED', ids.alice],
+    ['cancelled', ids.cancelledJob, 'CANCELLED', null],
+  ])('returns 409 when unassigning a %s job and leaves it unchanged', async (_label, jobId, status, technicianId) => {
+    const res = await assignment(jobId, { technicianId: null })
+
+    expect(res.status).toBe(409)
+    expect(res.body.error).toEqual({ code: 'JOB_CLOSED', message: "This job is closed and can't be unassigned." })
+    expect(await prisma.job.findUnique({ where: { id: jobId }, select: { status: true, technicianId: true } })).toEqual({
+      status,
+      technicianId,
+    })
   })
 
   it('returns 404 when unassigning an unknown job', async () => {

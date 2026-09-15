@@ -87,6 +87,20 @@ describe('GET /api/technicians', () => {
     expect(bob.skills).toEqual(['Dishwashers', 'Fixtures & Faucets', 'Water Heaters'])
   })
 
+  it('counts only assigned jobs, not completed or cancelled ones', async () => {
+    // Alice already has a completed job in the fixture; close one of her two assigned jobs as well.
+    await prisma.job.update({
+      where: { id: ids.aliceBreakerJob },
+      data: { status: 'COMPLETED', completedAt: new Date('2030-01-01T20:00:00Z') },
+    })
+    await prisma.job.update({ where: { id: ids.bobWaterHeaterJob }, data: { status: 'CANCELLED', technicianId: null, assignedAt: null } })
+
+    const res = await request(app).get('/api/technicians')
+    const counts = Object.fromEntries(res.body.map((technician: { id: string; assignedJobCount: number }) => [technician.id, technician.assignedJobCount]))
+
+    expect(counts).toEqual({ [ids.alice]: 1, [ids.bob]: 0, [ids.carol]: 0 })
+  })
+
   it('returns an empty list of specialties for a technician without any', async () => {
     await prisma.technicianSkill.deleteMany({ where: { technicianId: ids.carol } })
 

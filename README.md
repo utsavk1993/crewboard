@@ -65,11 +65,11 @@ Run from the repository root.
 - **skill_categories**: name (unique), e.g. Appliance Repair
 - **skills**: a specialty within a category, e.g. Appliance Repair › Refrigerators; name (globally unique), `category_id`
 - **technicians**: name, email (unique), phone, designation, home base (`city_id`); specialties through **technician_skills** (`technician_id`, `skill_id`)
-- **jobs**: title, description, customer, address, job site (`city_id`), required specialty (`skill_id`), priority (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), scheduled date, nullable `technician_id`, `assigned_at`
+- **jobs**: title, description, customer, address, job site (`city_id`), required specialty (`skill_id`), priority (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), scheduled date, status (`OPEN`, `ASSIGNED`, `COMPLETED`, `CANCELLED`), nullable `technician_id`, `assigned_at`, `completed_at`
 
-A technician has many jobs and a job has at most one technician, so the foreign key lives on `jobs`; `technician_id = NULL` means unassigned. A technician's load is the number of jobs they hold.
+A technician has many jobs and a job has at most one technician, so the foreign key lives on `jobs`. A job's lifecycle is its status: `OPEN` jobs wait for a technician, `ASSIGNED` jobs are held by one, and `COMPLETED` or `CANCELLED` jobs are closed history (a completed job keeps its technician and `completed_at`). A technician's load is the number of `ASSIGNED` jobs they hold, so history never inflates it. The status sets live in `apps/api/src/job-status.ts`.
 
-The seed creates a service geography for a company headquartered in British Columbia with branches in Alberta: 2 provinces, 6 regions and 22 cities (British Columbia › Metro Vancouver, Fraser Valley, Capital Region, Central Okanagan; Alberta › Calgary Region, Edmonton Region). It adds 7 skill categories with 30 specialties, 28 technicians (16 based in Metro Vancouver) with a deliberately uneven workload and 2–5 specialties from one or two categories each, and 88 jobs (52 assigned, 36 unassigned, spread across every region). Job addresses use real street names and postal code prefixes for their city. Assigned jobs always require a specialty the technician has and are usually in the technician's region.
+The seed creates a service geography for a company headquartered in British Columbia with branches in Alberta: 2 provinces, 6 regions and 22 cities (British Columbia › Metro Vancouver, Fraser Valley, Capital Region, Central Okanagan; Alberta › Calgary Region, Edmonton Region). It adds 7 skill categories with 30 specialties, 28 technicians (16 based in Metro Vancouver) with a deliberately uneven workload and 2–5 specialties from one or two categories each, and 88 active jobs (52 assigned, 36 open, spread across every region). Job addresses use real street names and postal code prefixes for their city. Assigned jobs always require a specialty the technician has and are usually in the technician's region. On top of that it adds history: 113 completed jobs (2–6 per technician over the last 120 days, never before their hire date) and 8 cancelled jobs.
 
 Technicians include `specialties: { id, name, category: { id, name } }[]` (sorted by category, then specialty) and jobs include `skill: { id, name, category: { id, name } }`. Both include `location: { city: { id, name }, region: { id, name }, province: { code, name } }`: a technician's home base or a job's site. The older `skills` (specialty names), `requiredSkill` (specialty name) and technician `region` (home base city name) fields are still returned.
 
@@ -78,16 +78,18 @@ Technicians include `specialties: { id, name, category: { id, name } }[]` (sorte
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/api/health` | API and database health |
-| GET | `/api/technicians` | Technicians with `assignedJobCount` and `hiredOn`, sorted by name |
+| GET | `/api/technicians` | Technicians with `assignedJobCount` (`ASSIGNED` jobs only) and `hiredOn`, sorted by name |
 | GET | `/api/technicians/:id` | One technician, in the same shape as a list item |
-| GET | `/api/jobs` | All jobs, by scheduled date, then priority |
-| GET | `/api/jobs?unassigned=true` | Jobs with no technician |
-| GET | `/api/jobs?technicianId=<uuid>` | Jobs held by one technician |
+| GET | `/api/jobs` | Active (`OPEN` and `ASSIGNED`) jobs, by scheduled date, then priority |
+| GET | `/api/jobs?unassigned=true` | `OPEN` jobs |
+| GET | `/api/jobs?technicianId=<uuid>` | `ASSIGNED` jobs held by one technician |
 | PATCH | `/api/jobs/:id/assignment` | `{ "technicianId": "<uuid>" }` assigns, `{ "technicianId": null }` unassigns |
 
-Errors always use `{ "error": { "code", "message" } }`: `400 VALIDATION_ERROR` / `BAD_REQUEST`, `404 JOB_NOT_FOUND` / `TECHNICIAN_NOT_FOUND`, `409 JOB_ALREADY_ASSIGNED`.
+Jobs include `status` and `completedAt`.
 
-Assignment is a conditional update on `technician_id IS NULL`, so when two dispatchers assign the same job at once exactly one wins and the other gets `409`. Unassigning is idempotent.
+Errors always use `{ "error": { "code", "message" } }`: `400 VALIDATION_ERROR` / `BAD_REQUEST`, `404 JOB_NOT_FOUND` / `TECHNICIAN_NOT_FOUND`, `409 JOB_ALREADY_ASSIGNED` / `JOB_CLOSED`.
+
+Assigning moves an `OPEN` job to `ASSIGNED` with a conditional update on `status = 'OPEN' AND technician_id IS NULL`, so when two dispatchers assign the same job at once exactly one wins and the other gets `409 JOB_ALREADY_ASSIGNED`. Unassigning moves an `ASSIGNED` job back to `OPEN` and is idempotent for a job that is already open. Completed and cancelled jobs can't be assigned or unassigned (`409 JOB_CLOSED`).
 
 ### Web app
 
